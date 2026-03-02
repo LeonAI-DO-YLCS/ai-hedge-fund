@@ -18,6 +18,7 @@ from src.data.models import (
     InsiderTradeResponse,
     CompanyFactsResponse,
 )
+from src.tools.provider_config import get_instrument_category, is_mt5_provider
 
 # Global cache instance
 _cache = get_cache()
@@ -57,8 +58,33 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
         return response
 
 
+def _is_mt5_only_instrument(ticker: str) -> bool:
+    """Return True for MT5-native assets that lack fundamentals datasets."""
+    return get_instrument_category(ticker) != "equity"
+
+
+def _get_prices_from_mt5(ticker: str, start_date: str, end_date: str) -> list[Price] | None:
+    """Attempt to fetch prices from the MT5 Bridge.
+
+    Returns None on failure (caller should fall back to Financial Datasets API).
+    """
+    try:
+        from src.tools.mt5_client import MT5BridgeClient
+        client = MT5BridgeClient()
+        return client.get_prices(ticker, start_date, end_date)
+    except Exception as exc:
+        import logging
+        logging.getLogger("api").warning("MT5 Bridge price fetch failed for %s: %s", ticker, exc)
+        return None
+
+
 def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None) -> list[Price]:
-    """Fetch price data from cache or API."""
+    """Fetch price data from cache or API.
+
+    When ``DEFAULT_DATA_PROVIDER=mt5``, the MT5 Bridge is tried first.
+    On failure the function transparently falls back to the Financial
+    Datasets API.
+    """
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date}_{end_date}"
     
@@ -66,7 +92,17 @@ def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None)
     if cached_data := _cache.get_prices(cache_key):
         return [Price(**price) for price in cached_data]
 
-    # If not in cache, fetch from API
+    # --- MT5 routing (FR-007) ---
+    if is_mt5_provider():
+        mt5_prices = _get_prices_from_mt5(ticker, start_date, end_date)
+        if mt5_prices is not None:
+            _cache.set_prices(cache_key, [p.model_dump() for p in mt5_prices])
+            return mt5_prices
+        if _is_mt5_only_instrument(ticker):
+            return []
+        # Fall through to Financial Datasets API as fallback
+
+    # If not in cache and MT5 didn't provide data, fetch from Financial Datasets API
     headers = {}
     financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
     if financial_api_key:
@@ -100,6 +136,9 @@ def get_financial_metrics(
     api_key: str = None,
 ) -> list[FinancialMetrics]:
     """Fetch financial metrics from cache or API."""
+    if is_mt5_provider() and _is_mt5_only_instrument(ticker):
+        return []
+
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{period}_{end_date}_{limit}"
     
@@ -182,6 +221,9 @@ def get_insider_trades(
     api_key: str = None,
 ) -> list[InsiderTrade]:
     """Fetch insider trades from cache or API."""
+    if is_mt5_provider() and _is_mt5_only_instrument(ticker):
+        return []
+
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date or 'none'}_{end_date}_{limit}"
     
@@ -247,6 +289,9 @@ def get_company_news(
     api_key: str = None,
 ) -> list[CompanyNews]:
     """Fetch company news from cache or API."""
+    if is_mt5_provider() and _is_mt5_only_instrument(ticker):
+        return []
+
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date or 'none'}_{end_date}_{limit}"
     
