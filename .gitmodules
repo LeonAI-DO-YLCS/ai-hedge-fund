@@ -1,0 +1,3 @@
+[submodule "mt5-connection-bridge"]
+	path = mt5-connection-bridge
+	url = https://github.com/Leonai-do/mt5-connection-bridge.git
