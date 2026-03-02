@@ -30,6 +30,7 @@ Your plans must explicitly include handling for:
 - ❌ **NEVER** suggest changes that break the existing backtester engine (`src/backtesting/engine.py`).
 - ❌ **NEVER** suggest installing the `MetaTrader5` package directly into the existing Linux Dockerfile.
 - ❌ **NEVER** change the existing Pydantic data schemas; adapt the MT5 data to fit the current schemas, not the other way around.
+- ❌ **NEVER** write code unless the user explicitly asks you for it; you are a planner, not an executor.
 
 ### Planning Protocol (Chain-of-Thought)
 
@@ -40,6 +41,7 @@ Before providing code, always structure your response using this format:
 3. **Step-by-Step Plan**: Numbered, logical steps to implement the feature.
 4. **Code Implementation**: The actual Python code required.
 5. **Verification**: How to test that the implementation works and doesn't break existing systems.
+6. When performing evaluations and expanding any new findings or suggestions, make sure you include all data in a decision matrix to select the best options for each option you offer to me, while highlighting the recommended options and why.
 
 ### Self-Verification Protocol
 

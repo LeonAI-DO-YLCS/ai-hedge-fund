@@ -1,7 +1,9 @@
 import { cn } from '@/lib/utils';
-import { Cloud, Server } from 'lucide-react';
+import { Cloud, Link2, Server } from 'lucide-react';
 import { useState } from 'react';
+import { MT5BridgeSettings } from './models/bridge';
 import { CloudModels } from './models/cloud';
+import { LMStudioSettings } from './models/lmstudio';
 import { OllamaSettings } from './models/ollama';
 
 interface ModelsProps {
@@ -13,7 +15,7 @@ interface ModelSection {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   description: string;
-  component: React.ComponentType;
+  component: React.ComponentType<any>;
 }
 
 export function Models({ className }: ModelsProps) {
@@ -26,6 +28,20 @@ export function Models({ className }: ModelsProps) {
       icon: Cloud,
       description: 'API-based models from cloud providers',
       component: CloudModels,
+    },
+    {
+      id: 'bridge',
+      label: 'MT5 Bridge',
+      icon: Link2,
+      description: 'Bridge connection, account status, and symbol availability',
+      component: MT5BridgeSettings,
+    },
+    {
+      id: 'lmstudio',
+      label: 'LMStudio',
+      icon: Server,
+      description: 'LMStudio local provider status and model catalog',
+      component: LMStudioSettings,
     },
     {
       id: 'local',

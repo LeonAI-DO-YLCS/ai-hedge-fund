@@ -1,0 +1,17 @@
+[
+  {
+    "display_name": "Qwen 2.5 7B Instruct",
+    "model_name": "qwen2.5-7b-instruct",
+    "provider": "LMStudio"
+  },
+  {
+    "display_name": "Llama 3.1 8B Instruct",
+    "model_name": "llama-3.1-8b-instruct",
+    "provider": "LMStudio"
+  },
+  {
+    "display_name": "Mistral 7B Instruct",
+    "model_name": "mistral-7b-instruct",
+    "provider": "LMStudio"
+  }
+]

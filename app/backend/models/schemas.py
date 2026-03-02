@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from src.llm.models import ModelProvider
 from enum import Enum
 from app.backend.services.graph import extract_base_agent_key
@@ -55,6 +55,51 @@ class HedgeFundResponse(BaseModel):
 class ErrorResponse(BaseModel):
     message: str
     error: str | None = None
+
+
+class MT5ConnectionResponse(BaseModel):
+    status: Literal["ready", "degraded", "unavailable", "unknown"] = "unknown"
+    connected: bool
+    authorized: bool = False
+    broker: Optional[str] = None
+    account_id: Optional[int] = None
+    balance: Optional[float] = None
+    latency_ms: Optional[int] = None
+    last_checked_at: str
+    error: Optional[str] = None
+
+
+class MT5SymbolEntry(BaseModel):
+    ticker: str
+    mt5_symbol: str
+    category: str
+    lot_size: Optional[float] = None
+    enabled: bool = True
+    source: str = "symbols_yaml"
+    runtime_status: Optional[str] = None
+
+
+class MT5SymbolsResponse(BaseModel):
+    status: Literal["ready", "degraded", "unavailable", "unknown"] = "unknown"
+    symbols: List[MT5SymbolEntry]
+    count: int
+    last_refreshed_at: str
+    error: Optional[str] = None
+
+
+class ProviderModelResponse(BaseModel):
+    display_name: str
+    model_name: str
+
+
+class ProviderStatusResponse(BaseModel):
+    name: str
+    type: Literal["cloud", "local"]
+    available: bool
+    status: Literal["ready", "degraded", "unavailable", "unknown"]
+    error: Optional[str] = None
+    last_checked_at: str
+    models: List[ProviderModelResponse]
 
 
 # Base class for shared fields between HedgeFundRequest and BacktestRequest

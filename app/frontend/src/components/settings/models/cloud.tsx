@@ -1,7 +1,8 @@
 import { Badge } from '@/components/ui/badge';
+import { api, LanguageModelProviderResponse } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { Cloud, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface CloudModelsProps {
   className?: string;
@@ -11,18 +12,13 @@ interface CloudModel {
   display_name: string;
   model_name: string;
   provider: string;
-}
-
-interface ModelProvider {
-  name: string;
-  models: Array<{
-    display_name: string;
-    model_name: string;
-  }>;
+  status?: string;
+  available?: boolean;
+  error?: string | null;
 }
 
 export function CloudModels({ className }: CloudModelsProps) {
-  const [providers, setProviders] = useState<ModelProvider[]>([]);
+  const [providers, setProviders] = useState<LanguageModelProviderResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,16 +26,10 @@ export function CloudModels({ className }: CloudModelsProps) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:8000/language-models/providers');
-      if (response.ok) {
-        const data = await response.json();
-        setProviders(data.providers);
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        setError(`Failed to fetch providers: ${errorData.detail}`);
-      }
-    } catch (error) {
-      console.error('Failed to fetch cloud model providers:', error);
+      const data = await api.getLanguageModelProviders();
+      setProviders(data);
+    } catch (fetchError) {
+      console.error('Failed to fetch cloud model providers:', fetchError);
       setError('Failed to connect to backend service');
     }
     setLoading(false);
@@ -49,17 +39,22 @@ export function CloudModels({ className }: CloudModelsProps) {
     fetchProviders();
   }, []);
 
-  // Flatten all models from all providers into a single array
-  const allModels: CloudModel[] = providers.flatMap(provider =>
-    provider.models.map(model => ({
-      ...model,
-      provider: provider.name
-    }))
-  ).sort((a, b) => a.provider.localeCompare(b.provider));
+  const allModels: CloudModel[] = useMemo(() => {
+    return providers
+      .flatMap(provider =>
+        provider.models.map(model => ({
+          ...model,
+          provider: provider.name,
+          status: provider.status,
+          available: provider.available,
+          error: provider.error,
+        }))
+      )
+      .sort((a, b) => a.provider.localeCompare(b.provider));
+  }, [providers]);
 
   return (
-    <div className={cn("space-y-6", className)}>
-
+    <div className={cn('space-y-6', className)}>
       {error && (
         <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
@@ -74,8 +69,7 @@ export function CloudModels({ className }: CloudModelsProps) {
 
       <div className="space-y-2">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-primary
-          ">Available Models</h3>
+          <h3 className="font-medium text-primary">Available Models</h3>
           <span className="text-xs text-muted-foreground">
             {allModels.length} models from {providers.length} providers
           </span>
@@ -84,12 +78,12 @@ export function CloudModels({ className }: CloudModelsProps) {
         {loading ? (
           <div className="text-center py-8">
             <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Loading cloud models...</p>
+            <p className="text-sm text-muted-foreground">Loading providers...</p>
           </div>
         ) : allModels.length > 0 ? (
           <div className="space-y-1">
             {allModels.map((model) => (
-              <div 
+              <div
                 key={`${model.provider}-${model.model_name}`}
                 className="group flex items-center justify-between bg-muted hover-bg rounded-md px-3 py-2.5 transition-colors"
               >
@@ -97,14 +91,20 @@ export function CloudModels({ className }: CloudModelsProps) {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate text-primary">{model.display_name}</span>
                     {model.model_name !== model.display_name && (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {model.model_name}
-                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">{model.model_name}</span>
                     )}
                   </div>
+                  {model.error && (
+                    <p className="text-xs text-yellow-500 mt-1">{model.error}</p>
+                  )}
                 </div>
-                
+
                 <div className="flex items-center gap-2">
+                  {model.status && (
+                    <Badge className="text-xs bg-muted text-muted-foreground border-border">
+                      {model.status}
+                    </Badge>
+                  )}
                   <Badge className="text-xs text-primary bg-primary/10 border-primary/30 hover:bg-primary/20 hover:border-primary/50">
                     {model.provider}
                   </Badge>
@@ -123,4 +123,4 @@ export function CloudModels({ className }: CloudModelsProps) {
       </div>
     </div>
   );
-} 
+}

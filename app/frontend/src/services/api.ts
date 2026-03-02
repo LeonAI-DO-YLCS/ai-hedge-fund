@@ -9,6 +9,49 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+export interface MT5ConnectionStatus {
+  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | string;
+  connected: boolean;
+  authorized: boolean;
+  broker?: string | null;
+  account_id?: number | null;
+  balance?: number | null;
+  latency_ms?: number | null;
+  last_checked_at: string;
+  error?: string | null;
+}
+
+export interface MT5SymbolEntry {
+  ticker: string;
+  mt5_symbol: string;
+  category: string;
+  lot_size?: number | null;
+  enabled: boolean;
+  source: string;
+  runtime_status?: string | null;
+}
+
+export interface MT5SymbolsResponse {
+  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | string;
+  symbols: MT5SymbolEntry[];
+  count: number;
+  last_refreshed_at: string;
+  error?: string | null;
+}
+
+export interface LanguageModelProviderResponse {
+  name: string;
+  type?: 'cloud' | 'local';
+  available?: boolean;
+  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | string;
+  error?: string | null;
+  last_checked_at?: string;
+  models: Array<{
+    display_name: string;
+    model_name: string;
+  }>;
+}
+
 export const api = {
   /**
    * Gets the list of available agents from the backend
@@ -42,6 +85,59 @@ export const api = {
       return data.models;
     } catch (error) {
       console.error('Failed to fetch models:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets grouped provider metadata (availability + models)
+   */
+  getLanguageModelProviders: async (): Promise<LanguageModelProviderResponse[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/language-models/providers`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data.providers;
+    } catch (error) {
+      console.error('Failed to fetch language model providers:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets bridge connection status for settings UI.
+   */
+  getMT5Connection: async (): Promise<MT5ConnectionStatus> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/mt5/connection`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch MT5 connection status:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets MT5 symbol catalog from backend adapter.
+   */
+  getMT5Symbols: async (params?: { category?: string; enabledOnly?: boolean }): Promise<MT5SymbolsResponse> => {
+    try {
+      const qs = new URLSearchParams();
+      if (params?.category) qs.set('category', params.category);
+      if (typeof params?.enabledOnly === 'boolean') qs.set('enabled_only', String(params.enabledOnly));
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      const response = await fetch(`${API_BASE_URL}/mt5/symbols${suffix}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to fetch MT5 symbols:', error);
       throw error;
     }
   },

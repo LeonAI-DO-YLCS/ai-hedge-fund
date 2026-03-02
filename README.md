@@ -66,6 +66,9 @@ Required keys/values for the current integration:
 - `DEFAULT_DATA_PROVIDER=mt5`
 - `MT5_BRIDGE_URL=http://localhost:8001`
 - `MT5_BRIDGE_API_KEY=...`
+- `LMSTUDIO_ENABLED=true` (enable LMStudio provider checks)
+- `LMSTUDIO_BASE_URL=http://localhost:1234/v1` (LMStudio OpenAI-compatible endpoint)
+- `LMSTUDIO_API_KEY=` (optional, only needed if your LMStudio endpoint requires auth)
 
 ## Run the Stack
 
@@ -97,6 +100,20 @@ cd app/frontend
 npm install
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
+
+## UI Settings (Bridge + LMStudio)
+
+After backend and frontend are running, open `Settings > Models`:
+
+- **MT5 Bridge** tab:
+  - Shows bridge status (`ready/degraded/unavailable`) and account details.
+  - Refreshes continuously at source cadence (target every second).
+  - Uses `mt5-connection-bridge/config/symbols.yaml` as the authoritative symbol catalog.
+- **LMStudio** tab:
+  - Shows LMStudio availability/status and discovered models.
+  - Allows manual refresh when LMStudio server state changes.
+- **Fallback behavior**:
+  - If a selected LMStudio model becomes unavailable, the UI requires explicit confirmation before switching to a fallback model.
 
 ## Diagnostics and Validation
 

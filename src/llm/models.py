@@ -27,6 +27,7 @@ class ModelProvider(str, Enum):
     MISTRAL = "Mistral"
     OPENAI = "OpenAI"
     OLLAMA = "Ollama"
+    LMSTUDIO = "LMStudio"
     OPENROUTER = "OpenRouter"
     GIGACHAT = "GigaChat"
     AZURE_OPENAI = "Azure OpenAI"
@@ -97,12 +98,16 @@ def load_models_from_json(json_path: str) -> List[LLMModel]:
 current_dir = Path(__file__).parent
 models_json_path = current_dir / "api_models.json"
 ollama_models_json_path = current_dir / "ollama_models.json"
+lmstudio_models_json_path = current_dir / "lmstudio_models.json"
 
 # Load available models from JSON
 AVAILABLE_MODELS = load_models_from_json(str(models_json_path))
 
 # Load Ollama models from JSON
 OLLAMA_MODELS = load_models_from_json(str(ollama_models_json_path))
+
+# Load LMStudio models from JSON (optional catalog)
+LMSTUDIO_MODELS = load_models_from_json(str(lmstudio_models_json_path)) if lmstudio_models_json_path.exists() else []
 
 # Create LLM_ORDER in the format expected by the UI
 LLM_ORDER = [model.to_choice_tuple() for model in AVAILABLE_MODELS]
@@ -113,13 +118,13 @@ OLLAMA_LLM_ORDER = [model.to_choice_tuple() for model in OLLAMA_MODELS]
 
 def get_model_info(model_name: str, model_provider: str) -> LLMModel | None:
     """Get model information by model_name"""
-    all_models = AVAILABLE_MODELS + OLLAMA_MODELS
+    all_models = AVAILABLE_MODELS + OLLAMA_MODELS + LMSTUDIO_MODELS
     return next((model for model in all_models if model.model_name == model_name and model.provider == model_provider), None)
 
 
 def find_model_by_name(model_name: str) -> LLMModel | None:
     """Find a model by its name across all available models."""
-    all_models = AVAILABLE_MODELS + OLLAMA_MODELS
+    all_models = AVAILABLE_MODELS + OLLAMA_MODELS + LMSTUDIO_MODELS
     return next((model for model in all_models if model.model_name == model_name), None)
 
 
@@ -179,6 +184,11 @@ def get_model(model_name: str, model_provider: ModelProvider, api_keys: dict = N
             model=model_name,
             base_url=base_url,
         )
+    elif model_provider == ModelProvider.LMSTUDIO:
+        # LMStudio exposes an OpenAI-compatible local endpoint.
+        base_url = os.getenv("LMSTUDIO_BASE_URL", "http://localhost:1234/v1").rstrip("/")
+        api_key = (api_keys or {}).get("LMSTUDIO_API_KEY") or os.getenv("LMSTUDIO_API_KEY") or "lm-studio"
+        return ChatOpenAI(model=model_name, api_key=api_key, base_url=base_url)
     elif model_provider == ModelProvider.OPENROUTER:
         api_key = (api_keys or {}).get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
         if not api_key:

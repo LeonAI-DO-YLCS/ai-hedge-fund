@@ -4,6 +4,7 @@
 
 # Poetry
 .venv
+.venv312
 __pycache__/
 *.py[cod]
 *$py.class
@@ -11,6 +12,7 @@ __pycache__/
 
 # Environment
 .env
+.env*
 
 # IDEs and editors
 .idea/
@@ -22,6 +24,11 @@ __pycache__/
 logs/
 data/
 *.log
+coverage/
+dist/
+build/
+node_modules/
+app/frontend/node_modules/
 
 # OS specific
 .DS_Store

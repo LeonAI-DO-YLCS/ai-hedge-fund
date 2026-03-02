@@ -3,7 +3,19 @@ import { api } from '@/services/api';
 export interface LanguageModel {
   display_name: string;
   model_name: string;
-  provider: "Anthropic" | "DeepSeek" | "Google" | "Groq" | "OpenAI";
+  provider:
+    | "Anthropic"
+    | "DeepSeek"
+    | "Google"
+    | "Groq"
+    | "OpenAI"
+    | "Ollama"
+    | "LMStudio"
+    | "OpenRouter"
+    | "xAI"
+    | "GigaChat"
+    | "Azure OpenAI"
+    | string;
 }
 
 // Cache for models to avoid repeated API calls

@@ -4,6 +4,7 @@ export enum ModelProvider {
   ANTHROPIC = 'Anthropic',
   GROQ = 'Groq',
   OLLAMA = 'Ollama',
+  LMSTUDIO = 'LMStudio',
 }
 
 export interface AgentModelConfig {

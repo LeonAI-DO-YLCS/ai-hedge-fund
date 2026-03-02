@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, HTTPException, Query
+
+from app.backend.models.schemas import ErrorResponse, MT5ConnectionResponse, MT5SymbolsResponse
+from app.backend.services.mt5_bridge_service import mt5_bridge_service
+
+router = APIRouter(prefix="/mt5")
+logger = logging.getLogger(__name__)
+
+
+@router.get(
+    path="/connection",
+    response_model=MT5ConnectionResponse,
+    responses={
+        200: {"description": "Bridge connection status"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_mt5_connection_status():
+    """Return backend-mediated MT5 bridge status.
+
+    Degraded states intentionally return 200 with `error` filled so UI can render recovery guidance.
+    """
+    try:
+        payload = mt5_bridge_service.get_connection_status()
+        if payload.get("status") != "ready":
+            logger.warning("MT5 bridge degraded: %s", payload.get("error"))
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query MT5 bridge: {exc}")
+
+
+@router.get(
+    path="/symbols",
+    response_model=MT5SymbolsResponse,
+    responses={
+        200: {"description": "MT5 symbol catalog"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_mt5_symbols(
+    category: str | None = Query(default=None, description="Optional category filter"),
+    enabled_only: bool = Query(default=True, description="Return only enabled symbols"),
+):
+    """Return symbol mappings sourced from symbols.yaml as authoritative UI catalog."""
+    try:
+        payload = mt5_bridge_service.get_symbols(category=category, enabled_only=enabled_only)
+        if payload.get("status") != "ready":
+            logger.warning("MT5 symbols degraded response: %s", payload.get("error"))
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load symbol catalog: {exc}")

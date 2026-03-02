@@ -27,3 +27,12 @@
 [2026-03-02T01:05:49-04:00] Step 20: Verified end-to-end path: UI(5173) -> Backend(8000) -> MT5 bridge(localhost:8001).
 [2026-03-02T01:06:03-04:00] Step 21: Final smoke check passed (backend ping + UI index reachable).
 [2026-03-02T01:07:38-04:00] Step 22: Fixed frontend import path case in App.tsx (./components/layout -> ./components/Layout).
+
+## UI Bridge + LMStudio Rollout Checklist
+
+- [ ] Confirm backend exposes `GET /mt5/connection` and `GET /mt5/symbols` with 200 degraded responses.
+- [ ] Confirm `GET /language-models/providers` returns LMStudio entry even when unavailable.
+- [ ] Confirm Settings > Models > MT5 Bridge updates status at 1-second cadence.
+- [ ] Confirm Settings > Models > LMStudio shows provider status and available models.
+- [ ] Confirm LMStudio stale selection requires explicit user confirmation before fallback.
+- [ ] Confirm no behavior regression in existing Ollama and cloud provider flows.

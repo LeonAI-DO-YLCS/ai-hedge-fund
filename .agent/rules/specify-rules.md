@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-03-02
 
 ## Active Technologies
+- Python 3.11+, TypeScript (React 18) + FastAPI, Pydantic v2, requests, React + Vite, Tailwind CSS, LangChain integrations (`langchain-openai`, `langchain-ollama`) (001-ui-bridge-lmstudio)
+- Existing SQLite (backend metadata), `mt5-connection-bridge/config/symbols.yaml` (symbol source), existing JSON model catalogs in `src/llm/` (001-ui-bridge-lmstudio)
 
 - Python 3.11+ + FastAPI (bridge), `MetaTrader5` (Windows-native), `requests` (client), `uvicorn` (server) (001-mt5-bridge)
 
@@ -22,6 +24,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 001-ui-bridge-lmstudio: Added Python 3.11+, TypeScript (React 18) + FastAPI, Pydantic v2, requests, React + Vite, Tailwind CSS, LangChain integrations (`langchain-openai`, `langchain-ollama`)
 
 - 001-mt5-bridge: Added Python 3.11+ + FastAPI (bridge), `MetaTrader5` (Windows-native), `requests` (client), `uvicorn` (server)
 
