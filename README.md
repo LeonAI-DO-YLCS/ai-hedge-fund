@@ -1,158 +1,130 @@
 # AI Hedge Fund
 
-This is a proof of concept for an AI-powered hedge fund.  The goal of this project is to explore the use of AI to make trading decisions.  This project is for **educational** purposes only and is not intended for real trading or investment.
+AI Hedge Fund is a research project that uses multiple AI agents to analyze markets and produce portfolio decisions.
 
-This system employs several agents working together:
-
-1. Aswath Damodaran Agent - The Dean of Valuation, focuses on story, numbers, and disciplined valuation
-2. Ben Graham Agent - The godfather of value investing, only buys hidden gems with a margin of safety
-3. Bill Ackman Agent - An activist investor, takes bold positions and pushes for change
-4. Cathie Wood Agent - The queen of growth investing, believes in the power of innovation and disruption
-5. Charlie Munger Agent - Warren Buffett's partner, only buys wonderful businesses at fair prices
-6. Michael Burry Agent - The Big Short contrarian who hunts for deep value
-7. Mohnish Pabrai Agent - The Dhandho investor, who looks for doubles at low risk
-8. Peter Lynch Agent - Practical investor who seeks "ten-baggers" in everyday businesses
-9. Phil Fisher Agent - Meticulous growth investor who uses deep "scuttlebutt" research 
-10. Rakesh Jhunjhunwala Agent - The Big Bull of India
-11. Stanley Druckenmiller Agent - Macro legend who hunts for asymmetric opportunities with growth potential
-12. Warren Buffett Agent - The oracle of Omaha, seeks wonderful companies at a fair price
-13. Valuation Agent - Calculates the intrinsic value of a stock and generates trading signals
-14. Sentiment Agent - Analyzes market sentiment and generates trading signals
-15. Fundamentals Agent - Analyzes fundamental data and generates trading signals
-16. Technicals Agent - Analyzes technical indicators and generates trading signals
-17. Risk Manager - Calculates risk metrics and sets position limits
-18. Portfolio Manager - Makes final trading decisions and generates orders
-
-<img width="1042" alt="Screenshot 2025-03-22 at 6 19 07 PM" src="https://github.com/user-attachments/assets/cbae3dcf-b571-490d-b0ad-3f0f035ac0d4" />
-
-Note: the system does not actually make any trades.
-
-[![Twitter Follow](https://img.shields.io/twitter/follow/virattt?style=social)](https://twitter.com/virattt)
+This fork is now integrated with a **MetaTrader 5 bridge** for market data and trade execution routing, designed for a Linux (Docker/WSL2) app + Windows MT5 terminal setup.
 
 ## Disclaimer
 
-This project is for **educational and research purposes only**.
+This project is for educational and research purposes only.
 
-- Not intended for real trading or investment
-- No investment advice or guarantees provided
-- Creator assumes no liability for financial losses
-- Consult a financial advisor for investment decisions
-- Past performance does not indicate future results
+- Not investment advice
+- No guarantee of performance
+- Use at your own risk
 
-By using this software, you agree to use it solely for learning purposes.
+## What Changed Recently
 
-## Table of Contents
-- [How to Install](#how-to-install)
-- [How to Run](#how-to-run)
-  - [⌨️ Command Line Interface](#️-command-line-interface)
-  - [🖥️ Web Application](#️-web-application)
-- [How to Contribute](#how-to-contribute)
-- [Feature Requests](#feature-requests)
-- [License](#license)
+- Added MT5 bridge integration as the primary live data provider path.
+- Added `mt5-connection-bridge` as a project submodule (Windows-native service).
+- Added provider routing for MT5-backed price retrieval and execution workflows.
+- Added diagnostics and live validation scripts.
+- Added validation journal and execution reports under `docs/`.
+- Fixed frontend Linux case-sensitive import issue in `app/frontend/src/App.tsx`:
+  - `./components/layout` -> `./components/Layout`
 
-## How to Install
+## Architecture (MT5 Bridge)
 
-Before you can run the AI Hedge Fund, you'll need to install it and set up your API keys. These steps are common to both the full-stack web application and command line interface.
+Because the `MetaTrader5` Python package is Windows-only, runtime is split:
 
-### 1. Clone the Repository
+- **Windows host**: `mt5-connection-bridge` FastAPI service connects to running MT5 terminal.
+- **WSL2/Linux app**: AI Hedge Fund backend calls the bridge over HTTP.
+- **Frontend**: Vite React app talks to backend only.
+
+Flow:
+
+`Frontend (5173) -> Backend API (8000) -> MT5 Bridge (8001 on host) -> MT5 Terminal`
+
+## Repository Layout
+
+- `src/` core hedge fund logic and backtesting engine
+- `app/backend/` FastAPI backend for the web app
+- `app/frontend/` React + Vite frontend
+- `mt5-connection-bridge/` Windows-native MT5 bridge service (submodule)
+- `scripts/diagnose_mt5.sh` diagnostics helper
+- `scripts/live_validate_mt5.sh` live validation helper
+- `docs/mt5-validation-journal-2026-03-02.md` validation timeline
+
+## Prerequisites
+
+- WSL2 + Docker installed
+- MT5 terminal installed and running on Windows host, demo account logged in
+- `uv` installed in WSL2
+- Node.js 20+ for frontend
+- API keys configured in root `.env`
+
+## Environment
+
+Create and update `.env` in the repository root:
 
 ```bash
-git clone https://github.com/virattt/ai-hedge-fund.git
-cd ai-hedge-fund
-```
-
-### 2. Set up API keys
-
-Create a `.env` file for your API keys:
-```bash
-# Create .env file for your API keys (in the root directory)
 cp .env.example .env
 ```
 
-Open and edit the `.env` file to add your API keys:
-```bash
-# For running LLMs hosted by openai (gpt-4o, gpt-4o-mini, etc.)
-OPENAI_API_KEY=your-openai-api-key
+Required keys/values for the current integration:
 
-# For getting financial data to power the hedge fund
-FINANCIAL_DATASETS_API_KEY=your-financial-datasets-api-key
-```
+- `DEEPSEEK_API_KEY` (or other supported LLM key)
+- `DEFAULT_DATA_PROVIDER=mt5`
+- `MT5_BRIDGE_URL=http://localhost:8001`
+- `MT5_BRIDGE_API_KEY=...`
 
-**Important**: You must set at least one LLM API key (e.g. `OPENAI_API_KEY`, `GROQ_API_KEY`, `ANTHROPIC_API_KEY`, or `DEEPSEEK_API_KEY`) for the hedge fund to work. 
+## Run the Stack
 
-**Financial Data**: Data for AAPL, GOOGL, MSFT, NVDA, and TSLA is free and does not require an API key. For any other ticker, you will need to set the `FINANCIAL_DATASETS_API_KEY` in the .env file.
-
-## How to Run
-
-### ⌨️ Command Line Interface
-
-You can run the AI Hedge Fund directly via terminal. This approach offers more granular control and is useful for automation, scripting, and integration purposes.
-
-<img width="992" alt="Screenshot 2025-01-06 at 5 50 17 PM" src="https://github.com/user-attachments/assets/e8ca04bf-9989-4a7d-a8b4-34e04666663b" />
-
-#### Quick Start
-
-1. Install Poetry (if not already installed):
-```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
-2. Install dependencies:
-```bash
-poetry install
-```
-
-#### Run the AI Hedge Fund
-```bash
-poetry run python src/main.py --ticker AAPL,MSFT,NVDA
-```
-
-You can also specify a `--ollama` flag to run the AI hedge fund using local LLMs.
+### 1) Start MT5 bridge on Windows (from WSL2)
 
 ```bash
-poetry run python src/main.py --ticker AAPL,MSFT,NVDA --ollama
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "
+  cd C:\\path\\to\\mt5-connection-bridge;
+  python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+"
 ```
 
-You can optionally specify the start and end dates to make decisions over a specific time period.
+Health check:
 
 ```bash
-poetry run python src/main.py --ticker AAPL,MSFT,NVDA --start-date 2024-01-01 --end-date 2024-03-01
+curl -H "X-API-KEY: $MT5_BRIDGE_API_KEY" http://localhost:8001/health
 ```
 
-#### Run the Backtester
+### 2) Start backend (WSL2)
+
 ```bash
-poetry run python src/backtester.py --ticker AAPL,MSFT,NVDA
+uv run uvicorn app.backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-**Example Output:**
-<img width="941" alt="Screenshot 2025-01-06 at 5 47 52 PM" src="https://github.com/user-attachments/assets/00e794ea-8628-44e6-9a84-8f8a31ad3b47" />
+### 3) Start frontend (WSL2)
 
+```bash
+cd app/frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
 
-Note: The `--ollama`, `--start-date`, and `--end-date` flags work for the backtester, as well!
+## Diagnostics and Validation
 
-### 🖥️ Web Application
+Run diagnostics:
 
-The new way to run the AI Hedge Fund is through our web application that provides a user-friendly interface. This is recommended for users who prefer visual interfaces over command line tools.
+```bash
+./scripts/diagnose_mt5.sh
+```
 
-Please see detailed instructions on how to install and run the web application [here](https://github.com/virattt/ai-hedge-fund/tree/main/app).
+Run live validation:
 
-<img width="1721" alt="Screenshot 2025-06-28 at 6 41 03 PM" src="https://github.com/user-attachments/assets/b95ab696-c9f4-416c-9ad1-51feb1f5374b" />
+```bash
+./scripts/live_validate_mt5.sh
+```
 
+Latest validated path (2026-03-02):
 
-## How to Contribute
+- Bridge health OK (`connected=true`, `authorized=true`)
+- Backend API reachable on `:8000`
+- Frontend reachable on `:5173`
+- End-to-end `/hedge-fund/run` completed with DeepSeek + MT5 ticker (`V75`)
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+See journal:
 
-**Important**: Please keep your pull requests small and focused.  This will make it easier to review and merge.
+- `docs/mt5-validation-journal-2026-03-02.md`
 
-## Feature Requests
+## Notes
 
-If you have a feature request, please open an [issue](https://github.com/virattt/ai-hedge-fund/issues) and make sure it is tagged with `enhancement`.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- Do not install `MetaTrader5` into Linux Docker images.
+- MT5 broker symbols may require mapping updates in bridge config (`mt5-connection-bridge/config/symbols.yaml`).
+- Core backtester engine and Pydantic schema contracts remain unchanged.
