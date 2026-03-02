@@ -1,6 +1,5 @@
 import sys
 
-from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 from colorama import Fore, Style, init
@@ -20,9 +19,6 @@ import argparse
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import json
-
-# Load environment variables from .env file
-load_dotenv()
 
 init(autoreset=True)
 
