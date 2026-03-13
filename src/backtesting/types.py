@@ -21,8 +21,8 @@ ActionLiteral = Literal["buy", "sell", "short", "cover", "hold"]
 class PositionState(TypedDict):
     """Represents per-ticker position state in the portfolio."""
 
-    long: int
-    short: int
+    long: float
+    short: float
     long_cost_basis: float
     short_cost_basis: float
     short_margin_used: float

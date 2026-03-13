@@ -136,8 +136,15 @@ def get_financial_metrics(
     api_key: str = None,
 ) -> list[FinancialMetrics]:
     """Fetch financial metrics from cache or API."""
-    if is_mt5_provider() and _is_mt5_only_instrument(ticker):
-        return []
+    if is_mt5_provider():
+        try:
+            from src.tools.mt5_client import MT5BridgeClient
+            client = MT5BridgeClient()
+            return client.get_financial_metrics(ticker, end_date, period, limit)
+        except Exception as exc:
+            import logging
+            logging.getLogger("api").warning("MT5 Bridge metrics fetch failed for %s: %s", ticker, exc)
+            return []
 
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{period}_{end_date}_{limit}"
@@ -181,6 +188,16 @@ def search_line_items(
     api_key: str = None,
 ) -> list[LineItem]:
     """Fetch line items from API."""
+    if is_mt5_provider():
+        try:
+            from src.tools.mt5_client import MT5BridgeClient
+            client = MT5BridgeClient()
+            return client.search_line_items(ticker, line_items, end_date, period, limit)
+        except Exception as exc:
+            import logging
+            logging.getLogger("api").warning("MT5 Bridge line items fetch failed for %s: %s", ticker, exc)
+            return []
+
     # If not in cache or insufficient data, fetch from API
     headers = {}
     financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
@@ -221,8 +238,15 @@ def get_insider_trades(
     api_key: str = None,
 ) -> list[InsiderTrade]:
     """Fetch insider trades from cache or API."""
-    if is_mt5_provider() and _is_mt5_only_instrument(ticker):
-        return []
+    if is_mt5_provider():
+        try:
+            from src.tools.mt5_client import MT5BridgeClient
+            client = MT5BridgeClient()
+            return client.get_insider_trades(ticker, end_date, start_date, limit)
+        except Exception as exc:
+            import logging
+            logging.getLogger("api").warning("MT5 Bridge insider trades fetch failed for %s: %s", ticker, exc)
+            return []
 
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date or 'none'}_{end_date}_{limit}"
@@ -289,8 +313,15 @@ def get_company_news(
     api_key: str = None,
 ) -> list[CompanyNews]:
     """Fetch company news from cache or API."""
-    if is_mt5_provider() and _is_mt5_only_instrument(ticker):
-        return []
+    if is_mt5_provider():
+        try:
+            from src.tools.mt5_client import MT5BridgeClient
+            client = MT5BridgeClient()
+            return client.get_company_news(ticker, end_date, start_date, limit)
+        except Exception as exc:
+            import logging
+            logging.getLogger("api").warning("MT5 Bridge company news fetch failed for %s: %s", ticker, exc)
+            return []
 
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date or 'none'}_{end_date}_{limit}"
@@ -355,6 +386,18 @@ def get_market_cap(
     api_key: str = None,
 ) -> float | None:
     """Fetch market cap from the API."""
+    
+    if is_mt5_provider():
+        try:
+            from src.tools.mt5_client import MT5BridgeClient
+            client = MT5BridgeClient()
+            facts_model = client.get_company_facts(ticker)
+            if facts_model and facts_model.market_cap is not None:
+                return float(facts_model.market_cap)
+        except Exception as exc:
+            pass
+        return None
+
     # Check if end_date is today
     if end_date == datetime.datetime.now().strftime("%Y-%m-%d"):
         # Get the market cap from company facts API

@@ -141,7 +141,7 @@ class BacktestEngine:
             )
             decisions = agent_output["decisions"]
 
-            executed_trades: Dict[str, int] = {}
+            executed_trades: Dict[str, float] = {}
             for ticker in self._tickers:
                 d = decisions.get(ticker, {"action": "hold", "quantity": 0})
                 action = d.get("action", "hold")

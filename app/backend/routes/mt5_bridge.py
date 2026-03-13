@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.backend.models.schemas import ErrorResponse, MT5ConnectionResponse, MT5SymbolsResponse
+from app.backend.models.schemas import ErrorResponse, MT5ConnectionResponse, MT5SymbolsResponse, MT5MetricsResponse
 from app.backend.services.mt5_bridge_service import mt5_bridge_service
 
 router = APIRouter(prefix="/mt5")
@@ -53,3 +53,23 @@ async def get_mt5_symbols(
         return payload
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load symbol catalog: {exc}")
+
+
+@router.get(
+    path="/metrics",
+    response_model=MT5MetricsResponse,
+    responses={
+        200: {"description": "Bridge operational metrics"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+)
+async def get_mt5_metrics():
+    """Proxy routine to fetch internal metrics from the MT5 Bridge API."""
+    try:
+        from app.backend.models.schemas import MT5MetricsResponse
+        payload = mt5_bridge_service.get_metrics()
+        if payload.get("status") != "ready":
+            logger.warning("MT5 metrics degraded response: %s", payload.get("error"))
+        return MT5MetricsResponse(**payload)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load MT5 bridge metrics: {exc}")

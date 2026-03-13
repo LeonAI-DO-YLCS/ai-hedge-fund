@@ -24,9 +24,9 @@ class TradeExecutor:
         quantity: float,
         current_price: float,
         portfolio: Portfolio,
-    ) -> int:
+    ) -> float:
         if quantity is None or quantity <= 0:
-            return 0
+            return 0.0
 
         # Coerce to enum if strings provided
         try:
@@ -51,20 +51,20 @@ class TradeExecutor:
                 )
                 if bool(response.get("success")):
                     filled_qty = float(response.get("filled_quantity") or quantity)
-                    return int(max(filled_qty, 0))
+                    return float(max(filled_qty, 0.0))
             except Exception as exc:
                 logger.exception("Live trade failed for %s %s: %s", ticker, action_enum.value, exc)
-            return 0
+            return 0.0
 
         if action_enum == Action.BUY:
-            return portfolio.apply_long_buy(ticker, int(quantity), float(current_price))
+            return portfolio.apply_long_buy(ticker, float(quantity), float(current_price))
         if action_enum == Action.SELL:
-            return portfolio.apply_long_sell(ticker, int(quantity), float(current_price))
+            return portfolio.apply_long_sell(ticker, float(quantity), float(current_price))
         if action_enum == Action.SHORT:
-            return portfolio.apply_short_open(ticker, int(quantity), float(current_price))
+            return portfolio.apply_short_open(ticker, float(quantity), float(current_price))
         if action_enum == Action.COVER:
-            return portfolio.apply_short_cover(ticker, int(quantity), float(current_price))
+            return portfolio.apply_short_cover(ticker, float(quantity), float(current_price))
 
         # hold or unknown action
-        return 0
+        return 0.0
 

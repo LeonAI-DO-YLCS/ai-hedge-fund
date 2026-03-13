@@ -86,6 +86,16 @@ class MT5SymbolsResponse(BaseModel):
     last_refreshed_at: str
     error: Optional[str] = None
 
+class MT5MetricsResponse(BaseModel):
+    status: Literal["ready", "degraded", "unavailable", "unknown"] = "unknown"
+    uptime_seconds: float = 0.0
+    total_requests: int = 0
+    requests_by_endpoint: Dict[str, int] = {}
+    errors_count: int = 0
+    last_request_at: Optional[str] = None
+    retention_days: int = 1
+    error: Optional[str] = None
+
 
 class ProviderModelResponse(BaseModel):
     display_name: str
@@ -147,7 +157,7 @@ class BacktestDayResult(BaseModel):
     portfolio_value: float
     cash: float
     decisions: Dict[str, Any]
-    executed_trades: Dict[str, int]
+    executed_trades: Dict[str, float]
     analyst_signals: Dict[str, Any]
     current_prices: Dict[str, float]
     long_exposure: float

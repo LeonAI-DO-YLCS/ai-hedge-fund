@@ -387,9 +387,9 @@ def format_backtest_row(
             date,
             f"{Fore.CYAN}{ticker}{Style.RESET_ALL}",
             f"{action_color}{action.upper()}{Style.RESET_ALL}",
-            f"{action_color}{quantity:,.0f}{Style.RESET_ALL}",
+            f"{action_color}{quantity:,.2f}{Style.RESET_ALL}",
             f"{Fore.WHITE}{price:,.2f}{Style.RESET_ALL}",
-            f"{Fore.GREEN}{long_shares:,.0f}{Style.RESET_ALL}",   # Long Shares
-            f"{Fore.RED}{short_shares:,.0f}{Style.RESET_ALL}",    # Short Shares
+            f"{Fore.GREEN}{long_shares:,.2f}{Style.RESET_ALL}",   # Long Shares
+            f"{Fore.RED}{short_shares:,.2f}{Style.RESET_ALL}",    # Short Shares
             f"{Fore.YELLOW}{position_value:,.2f}{Style.RESET_ALL}",
         ]

@@ -88,3 +88,26 @@ def get_instrument_category(ticker: str) -> str:
         return CATEGORY_CRYPTO
     return CATEGORY_EQUITY
 
+
+def get_mt5_bridge_url() -> str:
+    """Get the MT5 bridge URL. Uses host.docker.internal if not provided but implied by network topology."""
+    return os.environ.get("MT5_BRIDGE_URL", "http://localhost:8001").rstrip("/")
+
+
+def get_mt5_bridge_api_key() -> str:
+    """Get the MT5 bridge API key."""
+    return os.environ.get("MT5_BRIDGE_API_KEY", "")
+
+
+def is_mt5_native_symbol(ticker: str) -> bool:
+    """Return True if the symbol is native to MT5 (synthetic, forex, crypto) and lacks external fundamentals."""
+    category = get_instrument_category(ticker)
+    return category in (CATEGORY_SYNTHETIC, CATEGORY_FOREX, CATEGORY_CRYPTO)
+
+
+def should_route_to_mt5_bridge() -> bool:
+    """
+    Returns True if the MT5 bridge should be used.
+    In MT5 mode, the bridge is ALWAYS used (either gracefully degrading natively or proxying for equities).
+    """
+    return is_mt5_provider()

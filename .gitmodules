@@ -1,3 +1,10 @@
 [submodule "mt5-connection-bridge"]
 	path = mt5-connection-bridge
 	url = https://github.com/LeonAI-DO-YLCS/mt5-connection-bridge.git
+
+[submodule "Randomness and Inefficiencies Detector"]
+	path = Randomness and Inefficiencies Detector
+	url = https://github.com/LeonAI-DO-YLCS/Randomness-and-Inefficiencies Detector.git
+[submodule "spectre"]
+	path = spectre
+	url = https://github.com/LeonAI-DO-YLCS/spectre.git
