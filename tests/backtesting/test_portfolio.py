@@ -5,10 +5,10 @@ import pytest
 from src.backtesting.portfolio import Portfolio
 
 def test_apply_long_buy_basic(portfolio: Portfolio) -> None:
-    executed = portfolio.apply_long_buy("AAPL", quantity=100, price=50.0)
-    assert executed == 100
+    executed = portfolio.apply_long_buy("AAPL", quantity=100.0, price=50.0)
+    assert executed == 100.0
     snap = portfolio.get_snapshot()
-    assert snap["positions"]["AAPL"]["long"] == 100
+    assert snap["positions"]["AAPL"]["long"] == 100.0
     assert snap["positions"]["AAPL"]["long_cost_basis"] == pytest.approx(50.0)
     # cash reduced by 5,000
     assert snap["cash"] == pytest.approx(95_000.0)
@@ -118,7 +118,26 @@ def test_zero_or_negative_quantity_is_noop(portfolio: Portfolio, action: str) ->
         executed = portfolio.apply_short_cover("AAPL", 0, 10.0)
         executed2 = portfolio.apply_short_cover("AAPL", -5, 10.0)
     after = portfolio.get_snapshot()
-    assert executed == 0 and executed2 == 0
+    assert executed == 0.0 and executed2 == 0.0
     assert after == before
+
+def test_portfolio_fractional_lots_updates() -> None:
+    p = Portfolio(tickers=["V75"], initial_cash=10000.0, margin_requirement=1.0)
+    # buy 0.01 fractional lot
+    executed = p.apply_long_buy("V75", quantity=0.01, price=50000.0)
+    assert executed == 0.01
+    
+    snap = p.get_snapshot()
+    assert snap["positions"]["V75"]["long"] == 0.01
+    assert snap["cash"] == pytest.approx(9500.0)  # 10000 - (0.01 * 50000)
+    
+    # sell fractional lot
+    executed = p.apply_long_sell("V75", quantity=0.01, price=60000.0)
+    assert executed == 0.01
+    
+    snap = p.get_snapshot()
+    assert snap["positions"]["V75"]["long"] == 0.0
+    assert snap["cash"] == pytest.approx(10100.0)
+    assert snap["realized_gains"]["V75"]["long"] == pytest.approx(100.0)
 
 

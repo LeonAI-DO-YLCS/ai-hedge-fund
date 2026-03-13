@@ -23,7 +23,7 @@ class OutputBuilder:
         date_str: str,
         tickers: Sequence[str],
         agent_output: AgentOutput,
-        executed_trades: Mapping[str, int],
+        executed_trades: Mapping[str, float],
         current_prices: Mapping[str, float],
         portfolio: Portfolio,
         performance_metrics: Mapping[str, float | None],

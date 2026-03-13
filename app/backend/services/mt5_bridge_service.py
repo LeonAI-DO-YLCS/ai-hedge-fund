@@ -95,8 +95,19 @@ class MT5BridgeService:
 
         connected = bool(payload.get("connected", False))
         authorized = bool(payload.get("authorized", False))
-        default_error = None if connected else "MT5 bridge unavailable"
-        status = "ready" if connected and authorized else ("degraded" if connected else "unavailable")
+
+        # Handle explicit API errors from the bridge
+        if "detail" in payload and not connected:
+            error_val = payload.get("detail", str(payload))
+            default_error = f"Bridge Error: {error_val}"
+            status = "unavailable"
+        elif not payload:
+            from src.tools.provider_config import get_mt5_bridge_url
+            default_error = f"Bridge unreachable at {get_mt5_bridge_url()}. Check network or URL."
+            status = "unavailable"
+        else:
+            default_error = None if connected else "MT5 bridge unavailable"
+            status = "ready" if connected and authorized else ("degraded" if connected else "unavailable")
 
         return {
             "status": status,
@@ -134,6 +145,29 @@ class MT5BridgeService:
             "count": len(entries),
             "last_refreshed_at": _utc_now_iso(),
             "error": None if entries else "No symbols configured",
+        }
+
+    def get_metrics(self) -> dict[str, Any]:
+        """Fetch health/telemetry metrics from the MT5 bridge."""
+        try:
+            payload = self._client.get_metrics() or {}
+        except Exception as exc:
+            logger.warning("MT5 metrics check failed: %s", exc)
+            payload = {}
+        
+        # Determine status. If payload exists and uptime > 0, we can assume it's running
+        uptime = float(payload.get("uptime_seconds", 0.0))
+        status = "ready" if uptime > 0 else "unavailable"
+        
+        return {
+            "status": status,
+            "uptime_seconds": uptime,
+            "total_requests": int(payload.get("total_requests", 0)),
+            "requests_by_endpoint": payload.get("requests_by_endpoint", {}),
+            "errors_count": int(payload.get("errors_count", 0)),
+            "last_request_at": payload.get("last_request_at"),
+            "retention_days": int(payload.get("retention_days", 1)),
+            "error": "Failed to fetch MT5 bridge metrics" if not payload else None,
         }
 
 

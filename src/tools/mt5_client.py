@@ -22,7 +22,7 @@ from typing import Any
 
 import requests
 
-from src.data.models import Price
+from src.data.models import Price, FinancialMetrics, LineItem, InsiderTrade, CompanyNews, CompanyFacts
 
 logger = logging.getLogger("mt5_client")
 
@@ -79,12 +79,61 @@ class MT5BridgeClient:
 
         return [Price(**p) for p in data.get("prices", [])]
 
+    def get_financial_metrics(self, ticker: str, end_date: str, period: str = "ttm", limit: int = 10) -> list[FinancialMetrics]:
+        """Fetch financial metrics from the MT5 Bridge."""
+        params = {"ticker": ticker, "end_date": end_date, "period": period, "limit": limit}
+        data = self._request_with_retry("GET", "/financial-metrics", params=params)
+        if data is None:
+            return []
+        return [FinancialMetrics(**m) for m in data.get("financial_metrics", [])]
+
+    def search_line_items(self, ticker: str, line_items: list[str], end_date: str, period: str = "ttm", limit: int = 10) -> list[LineItem]:
+        """Fetch line items from the MT5 Bridge."""
+        payload = {"tickers": [ticker], "line_items": line_items, "end_date": end_date, "period": period, "limit": limit}
+        data = self._request_with_retry("POST", "/line-items/search", json=payload)
+        if data is None:
+            return []
+        return [LineItem(**m) for m in data.get("search_results", [])]
+
+    def get_insider_trades(self, ticker: str, end_date: str, start_date: str | None = None, limit: int = 1000) -> list[InsiderTrade]:
+        """Fetch insider trades from the MT5 Bridge."""
+        params = {"ticker": ticker, "end_date": end_date, "limit": limit}
+        if start_date:
+            params["start_date"] = start_date
+        data = self._request_with_retry("GET", "/insider-trades", params=params)
+        if data is None:
+            return []
+        return [InsiderTrade(**m) for m in data.get("insider_trades", [])]
+
+    def get_company_news(self, ticker: str, end_date: str, start_date: str | None = None, limit: int = 1000) -> list[CompanyNews]:
+        """Fetch company news from the MT5 Bridge."""
+        params = {"ticker": ticker, "end_date": end_date, "limit": limit}
+        if start_date:
+            params["start_date"] = start_date
+        data = self._request_with_retry("GET", "/company-news", params=params)
+        if data is None:
+            return []
+        return [CompanyNews(**m) for m in data.get("news", [])]
+        
+    def get_company_facts(self, ticker: str) -> CompanyFacts | None:
+        """Fetch company facts from the MT5 Bridge."""
+        params = {"ticker": ticker}
+        data = self._request_with_retry("GET", "/company-facts", params=params)
+        if data is None or not data.get("company_facts"):
+            return CompanyFacts(ticker=ticker, name=ticker)
+        return CompanyFacts(**data.get("company_facts"))
+
     def check_health(self) -> dict[str, Any]:
         """Query the bridge health endpoint.
 
         Returns the raw JSON response as a dictionary.
         """
         data = self._request_with_retry("GET", "/health")
+        return data or {}
+
+    def get_metrics(self) -> dict[str, Any]:
+        """Query the bridge metrics endpoint."""
+        data = self._request_with_retry("GET", "/metrics")
         return data or {}
 
     def execute_trade(

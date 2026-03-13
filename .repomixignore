@@ -1,0 +1,21 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+Randomness and Inefficiencies Detector/
+mt5-connection-bridge/
+tests/
+tmp_ignore/
+venv/
+__pycache__/
+.env
+.venv
+.github/
+.codex/
+.archive/
+AI-hedge-fund-no-submodules.xml
+skills/
+specs/
+spectre/
+.opencode/
+.specify/
