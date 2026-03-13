@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Hedge Fund Design System Preview</title>
+    <style>
+      :root {
+        --color-surface-page: #060b14;
+        --color-surface-panel: #0f1724;
+        --color-text-primary: #e7edf8;
+        --color-text-secondary: #91a1bd;
+        --color-border-default: #1f2c40;
+        --color-action-primary: #4d8dff;
+        --color-action-primary-hover: #2e6ee0;
+        --color-action-accent: #22d3ee;
+        --color-status-gain: #16c784;
+        --color-status-loss: #ff5c7a;
+        --color-status-warn: #f5a524;
+        --radius-card: 16px;
+        --radius-button: 11px;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Geist, "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+        color: var(--color-text-primary);
+      }
+
+      .terminal-bg {
+        min-height: 100vh;
+        padding: 32px;
+        background-color: var(--color-surface-page);
+        background-image:
+          radial-gradient(circle at 12% 8%, rgb(77 141 255 / 0.25), transparent 30%),
+          radial-gradient(circle at 88% 2%, rgb(34 211 238 / 0.18), transparent 28%),
+          linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+        background-size: 100% 100%, 100% 100%, 26px 26px, 26px 26px;
+      }
+
+      .wrap { max-width: 1240px; margin: 0 auto; }
+      .eyebrow {
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        font-size: 12px;
+        color: var(--color-action-primary);
+        margin-bottom: 8px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 52px;
+        line-height: 1.1;
+      }
+      .sub {
+        color: var(--color-text-secondary);
+        max-width: 760px;
+        margin-top: 12px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 28px;
+      }
+
+      .card {
+        border-radius: var(--radius-card);
+        border: 1px solid var(--color-border-default);
+        background: var(--color-surface-panel);
+        padding: 24px;
+        box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+      }
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+      }
+      .card h2::after {
+        content: "";
+        display: inline-block;
+        width: 40px;
+        height: 1px;
+        margin-left: 12px;
+        background: var(--color-action-accent);
+        vertical-align: middle;
+      }
+
+      .btn {
+        border: 0;
+        border-radius: var(--radius-button);
+        padding: 10px 16px;
+        background: var(--color-action-primary);
+        color: #fff;
+        font-weight: 600;
+        box-shadow: 0 8px 20px rgb(11 95 255 / 0.25);
+        cursor: pointer;
+      }
+      .btn:hover { background: var(--color-action-primary-hover); }
+
+      .token-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .token {
+        border: 1px solid var(--color-border-default);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .token .label {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--color-text-secondary);
+      }
+      .token .value {
+        margin-top: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 14px;
+      }
+
+      .gain { color: var(--color-status-gain); }
+      .loss { color: var(--color-status-loss); }
+      .warn { color: var(--color-status-warn); }
+
+      @media (max-width: 1000px) {
+        .grid { grid-template-columns: 1fr; }
+        .token-grid { grid-template-columns: 1fr 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="terminal-bg">
+      <section class="wrap">
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding:14px 18px;">
+          <p class="eyebrow" style="margin:0; color:var(--color-action-accent);">Live Design System Control Surface</p>
+          <p style="margin:0; color:var(--color-text-secondary); font-size:12px;">Latency Budget: 42ms</p>
+        </div>
+        <p class="eyebrow">AI Hedge Fund Design System</p>
+        <h1>Dark-Mode Trading Interface With Institutional Clarity</h1>
+        <p class="sub">Purpose-built for graph execution, portfolio controls, and output diagnostics. No decorative noise, only readable hierarchy, action confidence, and fast status interpretation.</p>
+
+        <div class="grid" style="grid-template-columns:2fr 1fr;">
+          <article class="card">
+            <h2>Execution Overview</h2>
+            <div class="token-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+              <div class="token">
+                <div class="label">Active Flows</div>
+                <div class="value" style="color:var(--color-text-primary)">12</div>
+              </div>
+              <div class="token">
+                <div class="label">Win Rate</div>
+                <div class="value gain">68.4%</div>
+              </div>
+              <div class="token">
+                <div class="label">Drawdown</div>
+                <div class="value loss">-4.9%</div>
+              </div>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Primary Actions</h2>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+              <button class="btn">Run Backtest</button>
+              <button class="btn">Publish Flow</button>
+            </div>
+          </article>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <h2>Signal Status</h2>
+            <p class="gain">Gain Signals: +14.2%</p>
+            <p class="loss">Loss Signals: -3.1%</p>
+            <p class="warn">Warnings: 2 open constraints</p>
+          </article>
+          <article class="card">
+            <h2>System Intent</h2>
+            <p style="color:var(--color-text-secondary)">Semantic tokens define every critical state: command actions, risk markers, and signal confidence.</p>
+          </article>
+          <article class="card">
+            <h2>Alert Channel</h2>
+            <p style="color:var(--color-text-secondary)">3 model drifts detected. Next retrain window in 2h 14m.</p>
+          </article>
+        </div>
+
+        <article class="card" style="margin-top:16px">
+          <h2>Token Preview</h2>
+          <div class="token-grid">
+            <div class="token"><div class="label">Primary</div><div class="value" style="color:var(--color-action-primary)">#4D8DFF</div></div>
+            <div class="token"><div class="label">Accent</div><div class="value" style="color:var(--color-action-accent)">#22D3EE</div></div>
+            <div class="token"><div class="label">Gain</div><div class="value" style="color:var(--color-status-gain)">#16C784</div></div>
+            <div class="token"><div class="label">Loss</div><div class="value" style="color:var(--color-status-loss)">#FF5C7A</div></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

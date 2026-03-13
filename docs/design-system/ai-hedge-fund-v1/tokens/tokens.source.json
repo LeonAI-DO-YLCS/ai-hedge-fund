@@ -1,0 +1,207 @@
+{
+  "$schema": "https://www.designtokens.org/TR/2025.10/format/",
+  "primitive": {
+    "color": {
+      "neutral": {
+        "0": {
+          "$value": "#0F1724",
+          "$type": "color"
+        },
+        "100": {
+          "$value": "#0B1220",
+          "$type": "color"
+        },
+        "300": {
+          "$value": "#1F2C40",
+          "$type": "color"
+        },
+        "700": {
+          "$value": "#91A1BD",
+          "$type": "color"
+        },
+        "900": {
+          "$value": "#E7EDF8",
+          "$type": "color"
+        }
+      },
+      "brand": {
+        "500": {
+          "$value": "#4D8DFF",
+          "$type": "color"
+        },
+        "600": {
+          "$value": "#2E6EE0",
+          "$type": "color"
+        }
+      },
+      "signal": {
+        "500": {
+          "$value": "#22D3EE",
+          "$type": "color"
+        },
+        "gain": {
+          "$value": "#16C784",
+          "$type": "color"
+        },
+        "loss": {
+          "$value": "#FF5C7A",
+          "$type": "color"
+        },
+        "warn": {
+          "$value": "#F5A524",
+          "$type": "color"
+        }
+      }
+    },
+    "spacing": {
+      "1": {
+        "$value": "4px",
+        "$type": "dimension"
+      },
+      "2": {
+        "$value": "8px",
+        "$type": "dimension"
+      },
+      "3": {
+        "$value": "12px",
+        "$type": "dimension"
+      },
+      "4": {
+        "$value": "16px",
+        "$type": "dimension"
+      },
+      "6": {
+        "$value": "24px",
+        "$type": "dimension"
+      },
+      "8": {
+        "$value": "32px",
+        "$type": "dimension"
+      }
+    },
+    "radius": {
+      "sm": {
+        "$value": "6px",
+        "$type": "dimension"
+      },
+      "md": {
+        "$value": "10px",
+        "$type": "dimension"
+      },
+      "lg": {
+        "$value": "14px",
+        "$type": "dimension"
+      }
+    }
+  },
+  "semantic": {
+    "surface": {
+      "page": {
+        "$value": "{primitive.color.neutral.100}",
+        "$type": "color"
+      },
+      "panel": {
+        "$value": "{primitive.color.neutral.0}",
+        "$type": "color"
+      },
+      "elevated": {
+        "$value": "{primitive.color.neutral.0}",
+        "$type": "color"
+      }
+    },
+    "text": {
+      "primary": {
+        "$value": "{primitive.color.neutral.900}",
+        "$type": "color"
+      },
+      "secondary": {
+        "$value": "{primitive.color.neutral.700}",
+        "$type": "color"
+      }
+    },
+    "border": {
+      "default": {
+        "$value": "{primitive.color.neutral.300}",
+        "$type": "color"
+      }
+    },
+    "action": {
+      "primary": {
+        "$value": "{primitive.color.brand.500}",
+        "$type": "color"
+      },
+      "primaryHover": {
+        "$value": "{primitive.color.brand.600}",
+        "$type": "color"
+      },
+      "accent": {
+        "$value": "{primitive.color.signal.500}",
+        "$type": "color"
+      }
+    },
+    "status": {
+      "gain": {
+        "$value": "{primitive.color.signal.gain}",
+        "$type": "color"
+      },
+      "loss": {
+        "$value": "{primitive.color.signal.loss}",
+        "$type": "color"
+      },
+      "warn": {
+        "$value": "{primitive.color.signal.warn}",
+        "$type": "color"
+      }
+    }
+  },
+  "component": {
+    "button": {
+      "bg": {
+        "$value": "{semantic.action.primary}",
+        "$type": "color"
+      },
+      "bgHover": {
+        "$value": "{semantic.action.primaryHover}",
+        "$type": "color"
+      },
+      "text": {
+        "$value": "{primitive.color.neutral.0}",
+        "$type": "color"
+      },
+      "radius": {
+        "$value": "{primitive.radius.md}",
+        "$type": "dimension"
+      },
+      "paddingY": {
+        "$value": "{primitive.spacing.2}",
+        "$type": "dimension"
+      },
+      "paddingX": {
+        "$value": "{primitive.spacing.4}",
+        "$type": "dimension"
+      }
+    },
+    "card": {
+      "bg": {
+        "$value": "{semantic.surface.panel}",
+        "$type": "color"
+      },
+      "border": {
+        "$value": "{semantic.border.default}",
+        "$type": "color"
+      },
+      "radius": {
+        "$value": "{primitive.radius.lg}",
+        "$type": "dimension"
+      },
+      "padding": {
+        "$value": "{primitive.spacing.6}",
+        "$type": "dimension"
+      }
+    }
+  },
+  "meta": {
+    "domain": "fintech",
+    "notes": "Project-agnostic token baseline with semantic-first consumption"
+  }
+}
