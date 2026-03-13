@@ -1,0 +1,546 @@
+{
+  "symbol": "V75",
+  "volume": 0.001,
+  "health_before": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:33 GMT",
+      "server": "uvicorn",
+      "content-length": "147",
+      "content-type": "application/json"
+    },
+    "body": {
+      "connected": true,
+      "authorized": true,
+      "broker": "Deriv.com Limited",
+      "account_id": 32128051,
+      "balance": 10001.15,
+      "server_time_offset": null,
+      "latency_ms": 0
+    }
+  },
+  "tick_before": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:33 GMT",
+      "server": "uvicorn",
+      "content-length": "103",
+      "content-type": "application/json"
+    },
+    "body": {
+      "ticker": "V75",
+      "bid": 35879.15,
+      "ask": 35888.34,
+      "spread": 9.189999999995052,
+      "time": "2026-03-13T21:41:34Z"
+    }
+  },
+  "execute_request": {
+    "ticker": "V75",
+    "action": "buy",
+    "quantity": 0.001,
+    "current_price": 35888.34,
+    "multi_trade_mode": false
+  },
+  "execute_response": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:33 GMT",
+      "server": "uvicorn",
+      "content-length": "196",
+      "content-type": "application/json"
+    },
+    "body": {
+      "success": true,
+      "status": "filled",
+      "requested_quantity": 0.001,
+      "requested_price": 35888.34,
+      "filled_price": 35888.34,
+      "filled_quantity": 0.001,
+      "unfilled_quantity": 0.0,
+      "ticket_id": 8475426978,
+      "error": null
+    }
+  },
+  "positions_after_open": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:44 GMT",
+      "server": "uvicorn",
+      "content-length": "272",
+      "content-type": "application/json"
+    },
+    "body": {
+      "positions": [
+        {
+          "ticket": 8582306224,
+          "symbol": "Volatility 75 Index",
+          "type": "buy",
+          "volume": 0.001,
+          "price_open": 35888.34,
+          "price_current": 35879.94,
+          "sl": null,
+          "tp": null,
+          "profit": -0.01,
+          "swap": 0.0,
+          "time": "2026-03-13T21:41:35Z",
+          "magic": 88001,
+          "comment": "ai-hedge-fund mt"
+        }
+      ],
+      "count": 1
+    }
+  },
+  "selected_ticket_to_close": 8582306224,
+  "close_request": {
+    "ticket": 8582306224
+  },
+  "close_response": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:44 GMT",
+      "server": "uvicorn",
+      "content-length": "192",
+      "content-type": "application/json"
+    },
+    "body": {
+      "success": true,
+      "status": "failed",
+      "requested_quantity": null,
+      "requested_price": null,
+      "filled_price": 35884.01,
+      "filled_quantity": 0.001,
+      "unfilled_quantity": null,
+      "ticket_id": 8582306241,
+      "error": null
+    }
+  },
+  "positions_after_close": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:44 GMT",
+      "server": "uvicorn",
+      "content-length": "26",
+      "content-type": "application/json"
+    },
+    "body": {
+      "positions": [],
+      "count": 0
+    }
+  },
+  "orders_after_close": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:45 GMT",
+      "server": "uvicorn",
+      "content-length": "23",
+      "content-type": "application/json"
+    },
+    "body": {
+      "orders": [],
+      "count": 0
+    }
+  },
+  "logs_after_test": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:45 GMT",
+      "server": "uvicorn",
+      "content-length": "3758",
+      "content-type": "application/json"
+    },
+    "body": {
+      "total": 69,
+      "offset": 0,
+      "limit": 10,
+      "entries": [
+        {
+          "timestamp": "2026-03-03T03:15:21.383426+00:00",
+          "request": {
+            "ticker": "UNKNOWN",
+            "action": "buy",
+            "quantity": 0.01,
+            "current_price": 1.0,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "Unknown ticker: UNKNOWN"
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "blocked_unknown_ticker"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T03:17:04.057812+00:00",
+          "request": {
+            "ticker": "V75",
+            "action": "buy",
+            "quantity": 0.01,
+            "current_price": 35414.06,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "Execution disabled by policy (EXECUTION_ENABLED=false)."
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "blocked_execution_disabled"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T03:17:27.584215+00:00",
+          "request": {
+            "ticker": "V75",
+            "action": "buy",
+            "quantity": 0.01,
+            "current_price": 35415.76,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "Order rejected (retcode=10030): Unsupported filling mode"
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "order_rejected"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T12:57:44.959355+00:00",
+          "request": {
+            "ticker": "Volatility 75 Index",
+            "action": "buy",
+            "quantity": 0.01,
+            "current_price": 35428.04,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null,
+            "mt5_symbol_direct": "Volatility 75 Index"
+          },
+          "response": {
+            "success": true,
+            "filled_price": 35416.42,
+            "filled_quantity": 0.01,
+            "ticket_id": 8571511654,
+            "error": null
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "fill_confirmed"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T12:58:11.273438+00:00",
+          "request": {
+            "ticket": 8571511654,
+            "volume": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "order_send returned None: (-2, 'Invalid \"comment\" argument')"
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "order_send_none"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T12:58:25.726175+00:00",
+          "request": {
+            "ticket": 8571511654,
+            "volume": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "order_send returned None: (-2, 'Invalid \"comment\" argument')"
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "order_send_none"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T19:49:26.268983+00:00",
+          "request": {
+            "ticker": "Boom 1000 Index",
+            "action": "buy",
+            "quantity": 0.2,
+            "current_price": 14717.3484,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null,
+            "mt5_symbol_direct": "Boom 1000 Index"
+          },
+          "response": {
+            "success": true,
+            "filled_price": 14717.3194,
+            "filled_quantity": 0.2,
+            "ticket_id": 8571951492,
+            "error": null
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "fill_confirmed"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T20:13:15.196104+00:00",
+          "request": {
+            "ticker": "Boom 1000 Index",
+            "action": "buy",
+            "quantity": 0.2,
+            "current_price": 14695.6634,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null,
+            "mt5_symbol_direct": "Boom 1000 Index"
+          },
+          "response": {
+            "success": true,
+            "filled_price": 14695.6454,
+            "filled_quantity": 0.2,
+            "ticket_id": 8571966609,
+            "error": null
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "fill_confirmed"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T23:10:19.194815+00:00",
+          "request": {
+            "ticker": "AAPL",
+            "action": "buy",
+            "quantity": 0.01,
+            "current_price": 100.0,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null,
+            "mt5_symbol_direct": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "Unknown ticker: AAPL"
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "blocked_unknown_ticker"
+          }
+        },
+        {
+          "timestamp": "2026-03-03T23:10:19.238598+00:00",
+          "request": {
+            "ticker": "AAPL",
+            "action": "buy",
+            "quantity": 0.01,
+            "current_price": 100.0,
+            "multi_trade_mode": false,
+            "sl": null,
+            "tp": null,
+            "mt5_symbol_direct": null
+          },
+          "response": {
+            "success": false,
+            "filled_price": null,
+            "filled_quantity": null,
+            "ticket_id": null,
+            "error": "Unknown ticker: AAPL"
+          },
+          "outcome": null,
+          "metadata": {
+            "state": "blocked_unknown_ticker"
+          }
+        }
+      ]
+    }
+  },
+  "history_deals_after_test": {
+    "status_code": 200,
+    "headers": {
+      "date": "Fri, 13 Mar 2026 21:41:45 GMT",
+      "server": "uvicorn",
+      "content-length": "2354",
+      "content-type": "application/json"
+    },
+    "body": {
+      "deals": [
+        {
+          "ticket": 8463664613,
+          "order_ticket": 0,
+          "position_id": 0,
+          "symbol": "",
+          "type": "balance",
+          "entry": "in",
+          "volume": 0.0,
+          "price": 0.0,
+          "profit": 10000.0,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-02T03:37:08Z",
+          "magic": 0
+        },
+        {
+          "ticket": 8465073472,
+          "order_ticket": 8571511654,
+          "position_id": 8571511654,
+          "symbol": "Volatility 75 Index",
+          "type": "buy",
+          "entry": "in",
+          "volume": 0.01,
+          "price": 35416.42,
+          "profit": 0.0,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-03T12:57:45Z",
+          "magic": 88001
+        },
+        {
+          "ticket": 8465077094,
+          "order_ticket": 8571515366,
+          "position_id": 8571511654,
+          "symbol": "Volatility 75 Index",
+          "type": "sell",
+          "entry": "out",
+          "volume": 0.01,
+          "price": 35598.87,
+          "profit": 1.8199999999999998,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-03T13:01:00Z",
+          "magic": 0
+        },
+        {
+          "ticket": 8465499710,
+          "order_ticket": 8571951492,
+          "position_id": 8571951492,
+          "symbol": "Boom 1000 Index",
+          "type": "buy",
+          "entry": "in",
+          "volume": 0.2,
+          "price": 14717.3194,
+          "profit": 0.0,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-03T19:49:26Z",
+          "magic": 88001
+        },
+        {
+          "ticket": 8465499797,
+          "order_ticket": 8571951573,
+          "position_id": 8571951492,
+          "symbol": "Boom 1000 Index",
+          "type": "sell",
+          "entry": "out",
+          "volume": 0.2,
+          "price": 14715.6195,
+          "profit": -0.34,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-03T19:49:32Z",
+          "magic": 0
+        },
+        {
+          "ticket": 8465514363,
+          "order_ticket": 8571966609,
+          "position_id": 8571966609,
+          "symbol": "Boom 1000 Index",
+          "type": "buy",
+          "entry": "in",
+          "volume": 0.2,
+          "price": 14695.6454,
+          "profit": 0.0,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-03T20:13:15Z",
+          "magic": 88001
+        },
+        {
+          "ticket": 8465514440,
+          "order_ticket": 8571966690,
+          "position_id": 8571966609,
+          "symbol": "Boom 1000 Index",
+          "type": "sell",
+          "entry": "out",
+          "volume": 0.2,
+          "price": 14694.0105,
+          "profit": -0.33,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-03T20:13:23Z",
+          "magic": 0
+        },
+        {
+          "ticket": 8475426978,
+          "order_ticket": 8582306224,
+          "position_id": 8582306224,
+          "symbol": "Volatility 75 Index",
+          "type": "buy",
+          "entry": "in",
+          "volume": 0.001,
+          "price": 35888.34,
+          "profit": 0.0,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-13T21:41:35Z",
+          "magic": 88001
+        },
+        {
+          "ticket": 8475426996,
+          "order_ticket": 8582306241,
+          "position_id": 8582306224,
+          "symbol": "Volatility 75 Index",
+          "type": "sell",
+          "entry": "out",
+          "volume": 0.001,
+          "price": 35884.01,
+          "profit": -0.0,
+          "swap": 0.0,
+          "commission": 0.0,
+          "fee": 0.0,
+          "time": "2026-03-13T21:41:46Z",
+          "magic": 88001
+        }
+      ],
+      "count": 9,
+      "net_profit": 10001.15,
+      "total_swap": 0.0,
+      "total_commission": 0.0
+    }
+  }
+}

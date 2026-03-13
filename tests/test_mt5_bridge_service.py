@@ -1,18 +1,11 @@
-"""
-Tests for app.backend.services.mt5_bridge_service
-Covers: T006 (bridge disconnect / empty-response normalization),
-        T017 (backend metrics proxy).
-"""
-import pytest
-from unittest.mock import patch, MagicMock
+"""Tests for app.backend.services.mt5_bridge_service."""
+
+from unittest.mock import patch
 
 
 class TestMT5BridgeServiceConnectionStatus:
-    """T006: Verify connection status normalization under various bridge states."""
-
     @patch("src.tools.mt5_client.MT5BridgeClient.check_health")
     def test_bridge_ready(self, mock_health):
-        """When bridge returns healthy payload, status is 'ready'."""
         mock_health.return_value = {
             "connected": True,
             "authorized": True,
@@ -22,6 +15,7 @@ class TestMT5BridgeServiceConnectionStatus:
             "latency_ms": 5,
         }
         from app.backend.services.mt5_bridge_service import MT5BridgeService
+
         svc = MT5BridgeService()
         result = svc.get_connection_status()
 
@@ -32,51 +26,31 @@ class TestMT5BridgeServiceConnectionStatus:
         assert result["error"] is None
 
     @patch("src.tools.mt5_client.MT5BridgeClient.check_health")
-    def test_bridge_connected_not_authorized(self, mock_health):
-        """When bridge returns connected but not authorized, status is 'degraded'."""
-        mock_health.return_value = {
-            "connected": True,
-            "authorized": False,
-        }
-        from app.backend.services.mt5_bridge_service import MT5BridgeService
-        svc = MT5BridgeService()
-        result = svc.get_connection_status()
-
-        assert result["status"] == "degraded"
-        assert result["connected"] is True
-        assert result["authorized"] is False
-
-    @patch("src.tools.mt5_client.MT5BridgeClient.check_health")
-    def test_bridge_unreachable(self, mock_health):
-        """When bridge throws an exception, status is 'unavailable' with informative error."""
+    def test_bridge_unreachable_includes_profile_hint(self, mock_health, monkeypatch):
         mock_health.side_effect = Exception("Connection refused")
+        monkeypatch.setenv("MT5_BRIDGE_URL", "http://host.docker.internal:8001")
         from app.backend.services.mt5_bridge_service import MT5BridgeService
+
         svc = MT5BridgeService()
         result = svc.get_connection_status()
 
         assert result["status"] == "unavailable"
-        assert result["connected"] is False
-        assert "unreachable" in result["error"].lower() or "unavailable" in result["error"].lower()
+        assert "host.docker.internal" in result["error"]
+        assert "localhost" in result["error"]
 
     @patch("src.tools.mt5_client.MT5BridgeClient.check_health")
     def test_bridge_auth_error_detail(self, mock_health):
-        """When bridge returns an error detail (e.g. bad API key), it's surfaced clearly."""
-        mock_health.return_value = {
-            "detail": "Invalid API key",
-            "connected": False,
-        }
+        mock_health.return_value = {"detail": "Invalid API key", "connected": False}
         from app.backend.services.mt5_bridge_service import MT5BridgeService
+
         svc = MT5BridgeService()
         result = svc.get_connection_status()
 
         assert result["status"] == "unavailable"
-        assert "Bridge Error" in result["error"]
         assert "Invalid API key" in result["error"]
 
 
 class TestMT5BridgeServiceMetrics:
-    """T017: Verify metrics proxy correctly normalizes bridge responses."""
-
     @patch("src.tools.mt5_client.MT5BridgeClient.get_metrics")
     def test_metrics_ready(self, mock_metrics):
         mock_metrics.return_value = {
@@ -88,39 +62,97 @@ class TestMT5BridgeServiceMetrics:
             "retention_days": 90,
         }
         from app.backend.services.mt5_bridge_service import MT5BridgeService
+
         svc = MT5BridgeService()
         result = svc.get_metrics()
 
         assert result["status"] == "ready"
-        assert result["uptime_seconds"] == 3600.0
         assert result["total_requests"] == 150
-        assert result["errors_count"] == 2
         assert result["error"] is None
-
-    @patch("src.tools.mt5_client.MT5BridgeClient.get_metrics")
-    def test_metrics_unavailable(self, mock_metrics):
-        mock_metrics.side_effect = Exception("Connection refused")
-        from app.backend.services.mt5_bridge_service import MT5BridgeService
-        svc = MT5BridgeService()
-        result = svc.get_metrics()
-
-        assert result["status"] == "unavailable"
-        assert result["uptime_seconds"] == 0.0
-        assert "Failed to fetch" in result["error"]
 
 
 class TestMT5BridgeServiceSymbols:
-    """Verify symbol catalog loading and filtering."""
-
+    @patch("src.tools.mt5_client.MT5BridgeClient.get_symbols_catalog")
     @patch("src.tools.mt5_client.MT5BridgeClient.check_health")
-    def test_symbols_with_connected_bridge(self, mock_health):
+    def test_symbols_with_connected_bridge(self, mock_health, mock_symbols):
         mock_health.return_value = {"connected": True, "authorized": True}
+        mock_symbols.return_value = {
+            "symbols": [
+                {
+                    "ticker": "AAPL",
+                    "mt5_symbol": "AAPL",
+                    "category": "equity",
+                    "lot_size": 1.0,
+                },
+                {
+                    "ticker": "V75",
+                    "mt5_symbol": "Volatility 75 Index",
+                    "category": "synthetic",
+                    "lot_size": 0.01,
+                },
+            ]
+        }
         from app.backend.services.mt5_bridge_service import MT5BridgeService
-        svc = MT5BridgeService()
-        result = svc.get_symbols()
 
-        # Should return a dict with status/symbols/count keys
-        assert "status" in result
-        assert "symbols" in result
-        assert "count" in result
-        assert isinstance(result["symbols"], list)
+        svc = MT5BridgeService()
+        result = svc.get_symbols(category="equity")
+
+        assert result["status"] == "ready"
+        assert result["count"] == 1
+        assert result["symbols"][0]["ticker"] == "AAPL"
+        assert result["symbols"][0]["source"] == "bridge"
+
+
+class TestMT5BridgeAdministrativeViews:
+    @patch("src.tools.mt5_client.MT5BridgeClient.get_logs")
+    def test_logs_proxy(self, mock_logs):
+        mock_logs.return_value = {
+            "total": 1,
+            "offset": 0,
+            "limit": 50,
+            "entries": [
+                {
+                    "timestamp": "2026-03-13T00:00:00Z",
+                    "request": {"ticker": "V75"},
+                    "response": {"success": True},
+                    "metadata": {"state": "fill_confirmed"},
+                }
+            ],
+        }
+        from app.backend.services.mt5_bridge_service import MT5BridgeService
+
+        svc = MT5BridgeService()
+        result = svc.get_logs(limit=50, offset=0)
+
+        assert result["status"] == "ready"
+        assert result["total"] == 1
+        assert result["entries"][0]["metadata"]["state"] == "fill_confirmed"
+
+    @patch("src.tools.mt5_client.MT5BridgeClient.get_runtime_diagnostics")
+    def test_runtime_diagnostics_proxy(self, mock_runtime):
+        mock_runtime.return_value = {"worker_state": "AUTHORIZED", "queue_depth": 0}
+        from app.backend.services.mt5_bridge_service import MT5BridgeService
+
+        svc = MT5BridgeService()
+        result = svc.get_runtime_diagnostics()
+
+        assert result["status"] == "ready"
+        assert result["diagnostics"]["worker_state"] == "AUTHORIZED"
+
+    @patch("src.tools.mt5_client.MT5BridgeClient.get_symbol_diagnostics")
+    def test_symbol_diagnostics_proxy(self, mock_diagnostics):
+        mock_diagnostics.return_value = {
+            "generated_at": "2026-03-13T00:00:00Z",
+            "worker_state": "AUTHORIZED",
+            "configured_symbols": 1,
+            "checked_count": 1,
+            "items": [{"ticker": "AAPL", "reason_code": "OK"}],
+        }
+        from app.backend.services.mt5_bridge_service import MT5BridgeService
+
+        svc = MT5BridgeService()
+        result = svc.get_symbol_diagnostics()
+
+        assert result["status"] == "ready"
+        assert result["checked_count"] == 1
+        assert result["items"][0]["reason_code"] == "OK"

@@ -14,6 +14,7 @@ class Action(str, Enum):
     COVER = "cover"
     HOLD = "hold"
 
+
 # Backward-compatible alias
 ActionLiteral = Literal["buy", "sell", "short", "cover", "hold"]
 
@@ -103,3 +104,23 @@ class PerformanceMetrics(TypedDict, total=False):
     net_exposure: Optional[float]
 
 
+ExecutionStatus = Literal[
+    "filled",
+    "partial_fill",
+    "rejected",
+    "failed",
+    "skipped",
+]
+
+
+class TradeExecutionResult(TypedDict):
+    ticker: str
+    action: ActionLiteral
+    requested_quantity: float
+    requested_price: float
+    filled_quantity: float
+    filled_price: Optional[float]
+    success: bool
+    status: ExecutionStatus
+    ticket_id: Optional[int]
+    error: Optional[str]

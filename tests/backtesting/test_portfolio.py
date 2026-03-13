@@ -4,6 +4,7 @@ import pytest
 
 from src.backtesting.portfolio import Portfolio
 
+
 def test_apply_long_buy_basic(portfolio: Portfolio) -> None:
     executed = portfolio.apply_long_buy("AAPL", quantity=100.0, price=50.0)
     assert executed == 100.0
@@ -24,7 +25,9 @@ def test_apply_long_buy_partial_fill_when_insufficient_cash() -> None:
     assert snap["cash"] == pytest.approx(0.0)
 
 
-def test_apply_long_sell_realized_gain_and_cost_basis_reset(portfolio: Portfolio) -> None:
+def test_apply_long_sell_realized_gain_and_cost_basis_reset(
+    portfolio: Portfolio,
+) -> None:
     # Buy 100 @ 50, then sell 100 @ 60 → realized gain = 100 * (60-50) = 1000
     portfolio.apply_long_buy("AAPL", 100, 50.0)
     executed = portfolio.apply_long_sell("AAPL", 100, 60.0)
@@ -74,7 +77,9 @@ def test_apply_short_open_partial_when_insufficient_margin_cash() -> None:
     assert snap["cash"] == pytest.approx(400.0)
 
 
-def test_apply_short_cover_realized_gain_and_margin_release(portfolio: Portfolio) -> None:
+def test_apply_short_cover_realized_gain_and_margin_release(
+    portfolio: Portfolio,
+) -> None:
     # Open short 100 @ 50, then cover 40 @ 40 → gain = (50-40)*40 = 400
     portfolio.apply_short_open("AAPL", 100, 50.0)
     pre = portfolio.get_snapshot()
@@ -100,9 +105,7 @@ def test_apply_short_cover_clamps_to_existing_short() -> None:
     assert p.get_snapshot()["positions"]["AAPL"]["short"] == 0
 
 
-@pytest.mark.parametrize("action", [
-    ("buy"), ("sell"), ("short"), ("cover")
-])
+@pytest.mark.parametrize("action", [("buy"), ("sell"), ("short"), ("cover")])
 def test_zero_or_negative_quantity_is_noop(portfolio: Portfolio, action: str) -> None:
     before = portfolio.get_snapshot()
     if action == "buy":
@@ -121,23 +124,58 @@ def test_zero_or_negative_quantity_is_noop(portfolio: Portfolio, action: str) ->
     assert executed == 0.0 and executed2 == 0.0
     assert after == before
 
+
 def test_portfolio_fractional_lots_updates() -> None:
     p = Portfolio(tickers=["V75"], initial_cash=10000.0, margin_requirement=1.0)
     # buy 0.01 fractional lot
     executed = p.apply_long_buy("V75", quantity=0.01, price=50000.0)
     assert executed == 0.01
-    
+
     snap = p.get_snapshot()
     assert snap["positions"]["V75"]["long"] == 0.01
     assert snap["cash"] == pytest.approx(9500.0)  # 10000 - (0.01 * 50000)
-    
+
     # sell fractional lot
     executed = p.apply_long_sell("V75", quantity=0.01, price=60000.0)
     assert executed == 0.01
-    
+
     snap = p.get_snapshot()
     assert snap["positions"]["V75"]["long"] == 0.0
     assert snap["cash"] == pytest.approx(10100.0)
     assert snap["realized_gains"]["V75"]["long"] == pytest.approx(100.0)
 
 
+def test_reconcile_live_fill_bypasses_cash_guard() -> None:
+    p = Portfolio(tickers=["V75"], initial_cash=100.0, margin_requirement=1.0)
+
+    executed = p.reconcile_live_fill("V75", "buy", 0.01, 50000.0)
+
+    assert executed == 0.01
+    snap = p.get_snapshot()
+    assert snap["positions"]["V75"]["long"] == 0.01
+    assert snap["positions"]["V75"]["long_cost_basis"] == pytest.approx(50000.0)
+    assert snap["cash"] == pytest.approx(-400.0)
+
+
+def test_record_execution_result_round_trip(portfolio: Portfolio) -> None:
+    portfolio.record_execution_result(
+        "AAPL",
+        {
+            "ticker": "AAPL",
+            "action": "buy",
+            "requested_quantity": 2.0,
+            "requested_price": 100.0,
+            "filled_quantity": 1.5,
+            "filled_price": 101.0,
+            "success": True,
+            "status": "partial_fill",
+            "ticket_id": 77,
+            "error": None,
+        },
+    )
+
+    execution = portfolio.get_last_execution_result("AAPL")
+    assert execution is not None
+    assert execution["filled_quantity"] == pytest.approx(1.5)
+    assert execution["status"] == "partial_fill"
+    assert execution["ticket_id"] == 77

@@ -18,26 +18,36 @@ from src.data.models import (
     InsiderTradeResponse,
     CompanyFactsResponse,
 )
-from src.tools.provider_config import get_instrument_category, is_mt5_provider
+from src.tools.provider_config import (
+    get_instrument_category,
+    is_mt5_provider,
+    should_route_to_mt5_bridge,
+)
 
 # Global cache instance
 _cache = get_cache()
 
 
-def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: dict = None, max_retries: int = 3) -> requests.Response:
+def _make_api_request(
+    url: str,
+    headers: dict,
+    method: str = "GET",
+    json_data: dict = None,
+    max_retries: int = 3,
+) -> requests.Response:
     """
     Make an API request with rate limiting handling and moderate backoff.
-    
+
     Args:
         url: The URL to request
         headers: Headers to include in the request
         method: HTTP method (GET or POST)
         json_data: JSON data for POST requests
         max_retries: Maximum number of retries (default: 3)
-    
+
     Returns:
         requests.Response: The response object
-    
+
     Raises:
         Exception: If the request fails with a non-429 error
     """
@@ -46,14 +56,16 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
             response = requests.post(url, headers=headers, json=json_data)
         else:
             response = requests.get(url, headers=headers)
-        
+
         if response.status_code == 429 and attempt < max_retries:
             # Linear backoff: 60s, 90s, 120s, 150s...
             delay = 60 + (30 * attempt)
-            print(f"Rate limited (429). Attempt {attempt + 1}/{max_retries + 1}. Waiting {delay}s before retrying...")
+            print(
+                f"Rate limited (429). Attempt {attempt + 1}/{max_retries + 1}. Waiting {delay}s before retrying..."
+            )
             time.sleep(delay)
             continue
-        
+
         # Return the response (whether success, other errors, or final 429)
         return response
 
@@ -63,44 +75,50 @@ def _is_mt5_only_instrument(ticker: str) -> bool:
     return get_instrument_category(ticker) != "equity"
 
 
-def _get_prices_from_mt5(ticker: str, start_date: str, end_date: str) -> list[Price] | None:
+def _get_prices_from_mt5(
+    ticker: str, start_date: str, end_date: str
+) -> list[Price] | None:
     """Attempt to fetch prices from the MT5 Bridge.
 
-    Returns None on failure (caller should fall back to Financial Datasets API).
+    Returns None on failure.
     """
     try:
         from src.tools.mt5_client import MT5BridgeClient
+
         client = MT5BridgeClient()
         return client.get_prices(ticker, start_date, end_date)
     except Exception as exc:
         import logging
-        logging.getLogger("api").warning("MT5 Bridge price fetch failed for %s: %s", ticker, exc)
+
+        logging.getLogger("api").warning(
+            "MT5 Bridge price fetch failed for %s: %s", ticker, exc
+        )
         return None
 
 
-def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None) -> list[Price]:
+def get_prices(
+    ticker: str, start_date: str, end_date: str, api_key: str = None
+) -> list[Price]:
     """Fetch price data from cache or API.
 
-    When ``DEFAULT_DATA_PROVIDER=mt5``, the MT5 Bridge is tried first.
-    On failure the function transparently falls back to the Financial
-    Datasets API.
+    When ``DEFAULT_DATA_PROVIDER=mt5``, the MT5 Bridge is the authoritative
+    source. Failures degrade safely to an empty response rather than bypassing
+    the bridge path.
     """
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date}_{end_date}"
-    
+
     # Check cache first - simple exact match
     if cached_data := _cache.get_prices(cache_key):
         return [Price(**price) for price in cached_data]
 
     # --- MT5 routing (FR-007) ---
-    if is_mt5_provider():
+    if should_route_to_mt5_bridge():
         mt5_prices = _get_prices_from_mt5(ticker, start_date, end_date)
         if mt5_prices is not None:
             _cache.set_prices(cache_key, [p.model_dump() for p in mt5_prices])
             return mt5_prices
-        if _is_mt5_only_instrument(ticker):
-            return []
-        # Fall through to Financial Datasets API as fallback
+        return []
 
     # If not in cache and MT5 didn't provide data, fetch from Financial Datasets API
     headers = {}
@@ -139,16 +157,20 @@ def get_financial_metrics(
     if is_mt5_provider():
         try:
             from src.tools.mt5_client import MT5BridgeClient
+
             client = MT5BridgeClient()
             return client.get_financial_metrics(ticker, end_date, period, limit)
         except Exception as exc:
             import logging
-            logging.getLogger("api").warning("MT5 Bridge metrics fetch failed for %s: %s", ticker, exc)
+
+            logging.getLogger("api").warning(
+                "MT5 Bridge metrics fetch failed for %s: %s", ticker, exc
+            )
             return []
 
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{period}_{end_date}_{limit}"
-    
+
     # Check cache first - simple exact match
     if cached_data := _cache.get_financial_metrics(cache_key):
         return [FinancialMetrics(**metric) for metric in cached_data]
@@ -191,11 +213,15 @@ def search_line_items(
     if is_mt5_provider():
         try:
             from src.tools.mt5_client import MT5BridgeClient
+
             client = MT5BridgeClient()
             return client.search_line_items(ticker, line_items, end_date, period, limit)
         except Exception as exc:
             import logging
-            logging.getLogger("api").warning("MT5 Bridge line items fetch failed for %s: %s", ticker, exc)
+
+            logging.getLogger("api").warning(
+                "MT5 Bridge line items fetch failed for %s: %s", ticker, exc
+            )
             return []
 
     # If not in cache or insufficient data, fetch from API
@@ -216,7 +242,7 @@ def search_line_items(
     response = _make_api_request(url, headers, method="POST", json_data=body)
     if response.status_code != 200:
         return []
-    
+
     try:
         data = response.json()
         response_model = LineItemResponse(**data)
@@ -241,16 +267,20 @@ def get_insider_trades(
     if is_mt5_provider():
         try:
             from src.tools.mt5_client import MT5BridgeClient
+
             client = MT5BridgeClient()
             return client.get_insider_trades(ticker, end_date, start_date, limit)
         except Exception as exc:
             import logging
-            logging.getLogger("api").warning("MT5 Bridge insider trades fetch failed for %s: %s", ticker, exc)
+
+            logging.getLogger("api").warning(
+                "MT5 Bridge insider trades fetch failed for %s: %s", ticker, exc
+            )
             return []
 
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date or 'none'}_{end_date}_{limit}"
-    
+
     # Check cache first - simple exact match
     if cached_data := _cache.get_insider_trades(cache_key):
         return [InsiderTrade(**trade) for trade in cached_data]
@@ -291,7 +321,9 @@ def get_insider_trades(
             break
 
         # Update end_date to the oldest filing date from current batch for next iteration
-        current_end_date = min(trade.filing_date for trade in insider_trades).split("T")[0]
+        current_end_date = min(trade.filing_date for trade in insider_trades).split(
+            "T"
+        )[0]
 
         # If we've reached or passed the start_date, we can stop
         if current_end_date <= start_date:
@@ -316,16 +348,20 @@ def get_company_news(
     if is_mt5_provider():
         try:
             from src.tools.mt5_client import MT5BridgeClient
+
             client = MT5BridgeClient()
             return client.get_company_news(ticker, end_date, start_date, limit)
         except Exception as exc:
             import logging
-            logging.getLogger("api").warning("MT5 Bridge company news fetch failed for %s: %s", ticker, exc)
+
+            logging.getLogger("api").warning(
+                "MT5 Bridge company news fetch failed for %s: %s", ticker, exc
+            )
             return []
 
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date or 'none'}_{end_date}_{limit}"
-    
+
     # Check cache first - simple exact match
     if cached_data := _cache.get_company_news(cache_key):
         return [CompanyNews(**news) for news in cached_data]
@@ -386,10 +422,11 @@ def get_market_cap(
     api_key: str = None,
 ) -> float | None:
     """Fetch market cap from the API."""
-    
+
     if is_mt5_provider():
         try:
             from src.tools.mt5_client import MT5BridgeClient
+
             client = MT5BridgeClient()
             facts_model = client.get_company_facts(ticker)
             if facts_model and facts_model.market_cap is not None:
@@ -441,6 +478,8 @@ def prices_to_df(prices: list[Price]) -> pd.DataFrame:
 
 
 # Update the get_price_data function to use the new functions
-def get_price_data(ticker: str, start_date: str, end_date: str, api_key: str = None) -> pd.DataFrame:
+def get_price_data(
+    ticker: str, start_date: str, end_date: str, api_key: str = None
+) -> pd.DataFrame:
     prices = get_prices(ticker, start_date, end_date, api_key=api_key)
     return prices_to_df(prices)

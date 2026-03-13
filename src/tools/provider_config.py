@@ -12,11 +12,16 @@ CATEGORY_EQUITY = "equity"
 CATEGORY_SYNTHETIC = "synthetic"
 CATEGORY_FOREX = "forex"
 CATEGORY_CRYPTO = "crypto"
+HOST_NATIVE_BRIDGE_URL = "http://localhost:8001"
+CONTAINER_BRIDGE_URL = "http://host.docker.internal:8001"
 
 
 def is_mt5_provider() -> bool:
     """Return True when MT5 is selected as default data provider."""
-    return os.environ.get("DEFAULT_DATA_PROVIDER", DEFAULT_PROVIDER).strip().lower() == "mt5"
+    return (
+        os.environ.get("DEFAULT_DATA_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+        == "mt5"
+    )
 
 
 def _load_category_map_from_env() -> dict[str, str]:
@@ -84,19 +89,52 @@ def get_instrument_category(ticker: str) -> str:
         return CATEGORY_SYNTHETIC
     if len(symbol) == 6 and symbol.isalpha():
         return CATEGORY_FOREX
-    if symbol.endswith("USD") and symbol not in {"EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDJPY", "USDCAD", "USDCHF"}:
+    if symbol.endswith("USD") and symbol not in {
+        "EURUSD",
+        "GBPUSD",
+        "AUDUSD",
+        "NZDUSD",
+        "USDJPY",
+        "USDCAD",
+        "USDCHF",
+    }:
         return CATEGORY_CRYPTO
     return CATEGORY_EQUITY
 
 
 def get_mt5_bridge_url() -> str:
-    """Get the MT5 bridge URL. Uses host.docker.internal if not provided but implied by network topology."""
-    return os.environ.get("MT5_BRIDGE_URL", "http://localhost:8001").rstrip("/")
+    """Return the configured MT5 bridge URL using the host-native profile as fallback."""
+    return os.environ.get("MT5_BRIDGE_URL", HOST_NATIVE_BRIDGE_URL).rstrip("/")
 
 
 def get_mt5_bridge_api_key() -> str:
     """Get the MT5 bridge API key."""
     return os.environ.get("MT5_BRIDGE_API_KEY", "")
+
+
+def get_mt5_connection_profile(url: str | None = None) -> str:
+    bridge_url = (url or get_mt5_bridge_url()).rstrip("/")
+    if bridge_url == HOST_NATIVE_BRIDGE_URL:
+        return "host-native"
+    if bridge_url == CONTAINER_BRIDGE_URL:
+        return "containerized"
+    return "custom"
+
+
+def get_mt5_profile_hint(url: str | None = None) -> str | None:
+    bridge_url = (url or get_mt5_bridge_url()).rstrip("/")
+    profile = get_mt5_connection_profile(bridge_url)
+    if profile == "host-native":
+        return (
+            "If the backend is running inside Docker, switch MT5_BRIDGE_URL to "
+            f"{CONTAINER_BRIDGE_URL}."
+        )
+    if profile == "containerized":
+        return (
+            "If the backend runs directly on WSL/Linux, switch MT5_BRIDGE_URL to "
+            f"{HOST_NATIVE_BRIDGE_URL}."
+        )
+    return None
 
 
 def is_mt5_native_symbol(ticker: str) -> bool:

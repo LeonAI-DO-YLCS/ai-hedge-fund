@@ -16,15 +16,23 @@ Usage::
 from __future__ import annotations
 
 import logging
-import os
 import time
-from typing import Any
+from typing import Any, TypeVar, cast
 
 import requests
 
-from src.data.models import Price, FinancialMetrics, LineItem, InsiderTrade, CompanyNews, CompanyFacts
+from src.data.models import (
+    Price,
+    FinancialMetrics,
+    LineItem,
+    InsiderTrade,
+    CompanyNews,
+    CompanyFacts,
+)
+from src.tools.provider_config import get_mt5_bridge_api_key, get_mt5_bridge_url
 
 logger = logging.getLogger("mt5_client")
+ModelT = TypeVar("ModelT")
 
 
 class MT5BridgeClient:
@@ -36,7 +44,7 @@ class MT5BridgeClient:
     - ``MT5_BRIDGE_API_KEY`` — shared API key for authentication
     """
 
-    DEFAULT_BASE_URL = "http://host.docker.internal:8001"
+    DEFAULT_BASE_URL = get_mt5_bridge_url()
     MAX_RETRIES = 3
     RETRY_BASE_DELAY = 1.0  # seconds
     TIMEOUT = 10  # seconds per request
@@ -46,8 +54,10 @@ class MT5BridgeClient:
         base_url: str | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.base_url = (base_url or os.getenv("MT5_BRIDGE_URL", self.DEFAULT_BASE_URL)).rstrip("/")
-        self.api_key = api_key or os.getenv("MT5_BRIDGE_API_KEY", "")
+        self.base_url = (
+            base_url or get_mt5_bridge_url() or self.DEFAULT_BASE_URL
+        ).rstrip("/")
+        self.api_key = api_key or get_mt5_bridge_api_key()
         self._session = requests.Session()
         self._session.headers["X-API-KEY"] = self.api_key
 
@@ -74,54 +84,84 @@ class MT5BridgeClient:
             "timeframe": timeframe,
         }
         data = self._request_with_retry("GET", "/prices", params=params)
-        if data is None:
-            return []
+        return self._parse_list_response(data, "prices", Price)
 
-        return [Price(**p) for p in data.get("prices", [])]
-
-    def get_financial_metrics(self, ticker: str, end_date: str, period: str = "ttm", limit: int = 10) -> list[FinancialMetrics]:
+    def get_financial_metrics(
+        self, ticker: str, end_date: str, period: str = "ttm", limit: int = 10
+    ) -> list[FinancialMetrics]:
         """Fetch financial metrics from the MT5 Bridge."""
-        params = {"ticker": ticker, "end_date": end_date, "period": period, "limit": limit}
+        params = {
+            "ticker": ticker,
+            "end_date": end_date,
+            "period": period,
+            "limit": limit,
+        }
         data = self._request_with_retry("GET", "/financial-metrics", params=params)
-        if data is None:
-            return []
-        return [FinancialMetrics(**m) for m in data.get("financial_metrics", [])]
+        return self._parse_list_response(data, "financial_metrics", FinancialMetrics)
 
-    def search_line_items(self, ticker: str, line_items: list[str], end_date: str, period: str = "ttm", limit: int = 10) -> list[LineItem]:
+    def search_line_items(
+        self,
+        ticker: str,
+        line_items: list[str],
+        end_date: str,
+        period: str = "ttm",
+        limit: int = 10,
+    ) -> list[LineItem]:
         """Fetch line items from the MT5 Bridge."""
-        payload = {"tickers": [ticker], "line_items": line_items, "end_date": end_date, "period": period, "limit": limit}
+        payload = {
+            "tickers": [ticker],
+            "line_items": line_items,
+            "end_date": end_date,
+            "period": period,
+            "limit": limit,
+        }
         data = self._request_with_retry("POST", "/line-items/search", json=payload)
-        if data is None:
-            return []
-        return [LineItem(**m) for m in data.get("search_results", [])]
+        return self._parse_list_response(data, "search_results", LineItem)
 
-    def get_insider_trades(self, ticker: str, end_date: str, start_date: str | None = None, limit: int = 1000) -> list[InsiderTrade]:
+    def get_insider_trades(
+        self,
+        ticker: str,
+        end_date: str,
+        start_date: str | None = None,
+        limit: int = 1000,
+    ) -> list[InsiderTrade]:
         """Fetch insider trades from the MT5 Bridge."""
         params = {"ticker": ticker, "end_date": end_date, "limit": limit}
         if start_date:
             params["start_date"] = start_date
         data = self._request_with_retry("GET", "/insider-trades", params=params)
-        if data is None:
-            return []
-        return [InsiderTrade(**m) for m in data.get("insider_trades", [])]
+        return self._parse_list_response(data, "insider_trades", InsiderTrade)
 
-    def get_company_news(self, ticker: str, end_date: str, start_date: str | None = None, limit: int = 1000) -> list[CompanyNews]:
+    def get_company_news(
+        self,
+        ticker: str,
+        end_date: str,
+        start_date: str | None = None,
+        limit: int = 1000,
+    ) -> list[CompanyNews]:
         """Fetch company news from the MT5 Bridge."""
         params = {"ticker": ticker, "end_date": end_date, "limit": limit}
         if start_date:
             params["start_date"] = start_date
         data = self._request_with_retry("GET", "/company-news", params=params)
-        if data is None:
-            return []
-        return [CompanyNews(**m) for m in data.get("news", [])]
-        
+        return self._parse_list_response(data, "news", CompanyNews)
+
     def get_company_facts(self, ticker: str) -> CompanyFacts | None:
         """Fetch company facts from the MT5 Bridge."""
         params = {"ticker": ticker}
         data = self._request_with_retry("GET", "/company-facts", params=params)
         if data is None or not data.get("company_facts"):
             return CompanyFacts(ticker=ticker, name=ticker)
-        return CompanyFacts(**data.get("company_facts"))
+        try:
+            facts_payload = data.get("company_facts")
+            if not isinstance(facts_payload, dict):
+                return CompanyFacts(ticker=ticker, name=ticker)
+            return CompanyFacts(**cast(dict[str, Any], facts_payload))
+        except Exception as exc:
+            logger.warning(
+                "Invalid MT5 Bridge company facts payload for %s: %s", ticker, exc
+            )
+            return CompanyFacts(ticker=ticker, name=ticker)
 
     def check_health(self) -> dict[str, Any]:
         """Query the bridge health endpoint.
@@ -134,6 +174,24 @@ class MT5BridgeClient:
     def get_metrics(self) -> dict[str, Any]:
         """Query the bridge metrics endpoint."""
         data = self._request_with_retry("GET", "/metrics")
+        return data or {}
+
+    def get_symbols_catalog(self) -> dict[str, Any]:
+        data = self._request_with_retry("GET", "/symbols")
+        return data or {}
+
+    def get_logs(self, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+        data = self._request_with_retry(
+            "GET", "/logs", params={"limit": limit, "offset": offset}
+        )
+        return data or {}
+
+    def get_runtime_diagnostics(self) -> dict[str, Any]:
+        data = self._request_with_retry("GET", "/diagnostics/runtime")
+        return data or {}
+
+    def get_symbol_diagnostics(self) -> dict[str, Any]:
+        data = self._request_with_retry("GET", "/diagnostics/symbols")
         return data or {}
 
     def execute_trade(
@@ -172,7 +230,9 @@ class MT5BridgeClient:
             raise_on_http_error=True,
         )
         if data is None:
-            raise requests.RequestException("No response from MT5 Bridge execute endpoint")
+            raise requests.RequestException(
+                "No response from MT5 Bridge execute endpoint"
+            )
         return data
 
     # ------------------------------------------------------------------
@@ -268,3 +328,22 @@ class MT5BridgeClient:
 
         logger.error("All %d retry attempts to MT5 Bridge exhausted.", self.MAX_RETRIES)
         return None
+
+    def _parse_list_response(
+        self, data: dict[str, Any] | None, key: str, model_cls: type[ModelT]
+    ) -> list[ModelT]:
+        if data is None:
+            return []
+        payload = data.get(key, [])
+        if not isinstance(payload, list):
+            return []
+
+        parsed: list[ModelT] = []
+        for item in payload:
+            try:
+                parsed.append(model_cls(**item))
+            except Exception as exc:
+                logger.warning(
+                    "Invalid MT5 Bridge payload for %s item=%s error=%s", key, item, exc
+                )
+        return parsed
