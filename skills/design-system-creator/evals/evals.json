@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "evals": [
+    {
+      "id": "fintech-dashboard-design-system",
+      "prompt": "Create a full design system for a fintech analytics dashboard, including tokens, component specs, governance docs, accessibility matrix, and a runnable sample app.",
+      "expected_trigger": true,
+      "required_artifacts": [
+        "tokens/tokens.source.json",
+        "specs/design-system-spec.md",
+        "specs/component-specs.md",
+        "docs/usage-guide.md",
+        "docs/governance.md",
+        "docs/a11y-conformance-matrix.md",
+        "sample-app/package.json",
+        "sample-app/src/App.tsx"
+      ]
+    },
+    {
+      "id": "healthcare-portal-design-system",
+      "prompt": "Define a neutral, universal design system for a healthcare patient portal and output docs plus a self-contained sample implementation package.",
+      "expected_trigger": true,
+      "required_artifacts": [
+        "tokens/tokens.source.json",
+        "specs/design-system-spec.md",
+        "specs/component-specs.md",
+        "docs/usage-guide.md",
+        "docs/governance.md",
+        "docs/a11y-conformance-matrix.md",
+        "sample-app/package.json",
+        "sample-app/src/main.tsx"
+      ]
+    },
+    {
+      "id": "ecommerce-design-system-refresh",
+      "prompt": "Refresh our ecommerce design language into a reusable design system with semantic tokens and documented component behavior.",
+      "expected_trigger": true,
+      "required_artifacts": [
+        "tokens/tokens.source.json",
+        "specs/design-system-spec.md",
+        "specs/component-specs.md",
+        "docs/usage-guide.md",
+        "docs/governance.md",
+        "docs/a11y-conformance-matrix.md",
+        "sample-app/src/components/Button.tsx"
+      ]
+    },
+    {
+      "id": "python-backtest-debug-task",
+      "prompt": "Debug my Python backtest memory leak and speed up vectorized calculations.",
+      "expected_trigger": false,
+      "required_artifacts": []
+    },
+    {
+      "id": "dockerfile-hardening-task",
+      "prompt": "Harden my Dockerfile and fix image size issues for production.",
+      "expected_trigger": false,
+      "required_artifacts": []
+    }
+  ]
+}
