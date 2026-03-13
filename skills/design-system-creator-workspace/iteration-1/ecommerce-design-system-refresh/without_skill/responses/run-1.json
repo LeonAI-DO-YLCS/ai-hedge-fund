@@ -1,0 +1,16 @@
+{
+  "run_index": 1,
+  "mode": "without_skill",
+  "triggered": true,
+  "artifact_root": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/iteration-1/ecommerce-design-system-refresh/without_skill/artifacts-run-1",
+  "missing_artifacts": [
+    "tokens/tokens.source.json",
+    "specs/design-system-spec.md",
+    "specs/component-specs.md",
+    "docs/usage-guide.md",
+    "docs/governance.md",
+    "docs/a11y-conformance-matrix.md",
+    "sample-app/src/components/Button.tsx"
+  ],
+  "notes": ""
+}

@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "iteration": "iteration-1",
+  "summary": {
+    "eval_count": 5,
+    "with_skill_pass_rate": 1.0,
+    "without_skill_pass_rate": 0.4,
+    "delta_pass_rate": 0.6,
+    "with_skill_trigger_precision": 1.0,
+    "with_skill_trigger_recall": 1.0,
+    "without_skill_trigger_precision": 1.0,
+    "without_skill_trigger_recall": 1.0
+  },
+  "eval_results": [
+    {
+      "id": "dockerfile-hardening-task",
+      "expected_trigger": false,
+      "with_skill": {
+        "overall_pass": true,
+        "trigger_rate": 0.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": false
+      },
+      "without_skill": {
+        "overall_pass": true,
+        "trigger_rate": 0.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": false
+      }
+    },
+    {
+      "id": "ecommerce-design-system-refresh",
+      "expected_trigger": true,
+      "with_skill": {
+        "overall_pass": true,
+        "trigger_rate": 1.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": true
+      },
+      "without_skill": {
+        "overall_pass": false,
+        "trigger_rate": 1.0,
+        "artifact_pass_rate": 0.0,
+        "trigger_predicted": true
+      }
+    },
+    {
+      "id": "fintech-dashboard-design-system",
+      "expected_trigger": true,
+      "with_skill": {
+        "overall_pass": true,
+        "trigger_rate": 1.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": true
+      },
+      "without_skill": {
+        "overall_pass": false,
+        "trigger_rate": 1.0,
+        "artifact_pass_rate": 0.0,
+        "trigger_predicted": true
+      }
+    },
+    {
+      "id": "healthcare-portal-design-system",
+      "expected_trigger": true,
+      "with_skill": {
+        "overall_pass": true,
+        "trigger_rate": 1.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": true
+      },
+      "without_skill": {
+        "overall_pass": false,
+        "trigger_rate": 1.0,
+        "artifact_pass_rate": 0.0,
+        "trigger_predicted": true
+      }
+    },
+    {
+      "id": "python-backtest-debug-task",
+      "expected_trigger": false,
+      "with_skill": {
+        "overall_pass": true,
+        "trigger_rate": 0.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": false
+      },
+      "without_skill": {
+        "overall_pass": true,
+        "trigger_rate": 0.0,
+        "artifact_pass_rate": 1.0,
+        "trigger_predicted": false
+      }
+    }
+  ]
+}

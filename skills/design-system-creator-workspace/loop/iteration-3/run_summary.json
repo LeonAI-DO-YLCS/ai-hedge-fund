@@ -1,0 +1,8 @@
+{
+  "iteration": 3,
+  "evals": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/loop/holdout-evals.json",
+  "workspace": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/loop",
+  "iteration_dir": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/loop/iteration-3",
+  "runs_per_query": 1,
+  "mode": "simulate"
+}

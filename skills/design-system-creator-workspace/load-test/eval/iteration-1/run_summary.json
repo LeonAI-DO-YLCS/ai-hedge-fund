@@ -1,0 +1,8 @@
+{
+  "iteration": 1,
+  "evals": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator/evals/evals.json",
+  "workspace": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/load-test/eval",
+  "iteration_dir": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/load-test/eval/iteration-1",
+  "runs_per_query": 1,
+  "mode": "simulate"
+}

@@ -1,0 +1,27 @@
+{
+  "train_evals": 3,
+  "holdout_evals": 2,
+  "iterations": [
+    {
+      "iteration": 1,
+      "benchmark_path": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/loop/iteration-1/benchmark.json",
+      "summary": {
+        "eval_count": 3,
+        "with_skill_pass_rate": 1.0,
+        "without_skill_pass_rate": 0.3333333333333333,
+        "delta_pass_rate": 0.6666666666666667,
+        "with_skill_trigger_precision": 1.0,
+        "with_skill_trigger_recall": 1.0,
+        "without_skill_trigger_precision": 1.0,
+        "without_skill_trigger_recall": 1.0
+      },
+      "score": 0.9166666666666667
+    }
+  ],
+  "best_iteration": {
+    "iteration": 1,
+    "score": 0.9166666666666667,
+    "benchmark": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/loop/iteration-1/benchmark.json"
+  },
+  "holdout_benchmark": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/skills/design-system-creator-workspace/loop/iteration-3/benchmark.json"
+}
