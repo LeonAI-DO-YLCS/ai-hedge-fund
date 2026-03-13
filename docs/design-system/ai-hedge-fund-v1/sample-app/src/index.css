@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-surface-page: #060b14;
+  --color-surface-panel: #0f1724;
+  --color-text-primary: #e7edf8;
+  --color-text-secondary: #91a1bd;
+  --color-border-default: #1f2c40;
+  --color-action-primary: #4d8dff;
+  --color-action-primary-hover: #2e6ee0;
+  --color-action-accent: #22d3ee;
+  --color-status-gain: #16c784;
+  --color-status-loss: #ff5c7a;
+  --color-status-warn: #f5a524;
+  --radius-card: 16px;
+  --radius-button: 11px;
+}
+
+body {
+  margin: 0;
+  font-family: Geist, "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+.terminal-bg {
+  background-color: var(--color-surface-page);
+  background-image:
+    radial-gradient(circle at 12% 8%, rgb(77 141 255 / 0.25), transparent 30%),
+    radial-gradient(circle at 88% 2%, rgb(34 211 238 / 0.18), transparent 28%),
+    linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 26px 26px, 26px 26px;
+  background-position: center, center, center, center;
+}

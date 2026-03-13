@@ -1,0 +1,11 @@
+{
+  "mode": "with_skill",
+  "expected_trigger": false,
+  "trigger_rate": 0.0,
+  "trigger_pass": true,
+  "artifact_pass_rate": 1.0,
+  "artifact_pass": true,
+  "overall_pass": true,
+  "required_artifacts": [],
+  "artifact_coverage": {}
+}

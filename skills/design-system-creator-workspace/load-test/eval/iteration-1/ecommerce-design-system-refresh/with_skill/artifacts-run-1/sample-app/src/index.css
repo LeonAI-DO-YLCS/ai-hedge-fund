@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-surface-page: #f4f6f8;
+  --color-surface-panel: #ffffff;
+  --color-text-primary: #0b1220;
+  --color-text-secondary: #1f2937;
+  --color-border-default: #d0d7de;
+  --color-action-primary: #0f766e;
+  --color-action-primary-hover: #0a5e59;
+  --radius-card: 14px;
+  --radius-button: 10px;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+}

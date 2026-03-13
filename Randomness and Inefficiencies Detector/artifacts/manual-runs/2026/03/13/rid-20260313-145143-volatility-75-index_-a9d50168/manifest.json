@@ -1,0 +1,245 @@
+{
+  "cache_path": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/Randomness and Inefficiencies Detector/artifacts/cache/fbe19e4e87243de3655c1ce6945ccdce03cc20b47c14db3a15fc18519ce2fd59.pkl",
+  "cache_used": true,
+  "completed_at": null,
+  "config_source": {
+    "analysis": {
+      "enabled_test_groups": [
+        "data_audit",
+        "directional_mds_tests",
+        "volatility_tests",
+        "regime_layer",
+        "tradability_filter",
+        "stability_validation"
+      ],
+      "era_scheme": {
+        "exploratory_ratio": 0.6,
+        "holdout_ratio": 0.2,
+        "minimum_rows_per_era": 20,
+        "name": "default_chronological",
+        "validation_ratio": 0.2
+      },
+      "friction_scenarios": [
+        {
+          "latency_bars": 1,
+          "name": "baseline",
+          "slippage_bps": 0.0,
+          "spread_multiplier": 1.0,
+          "turnover_limit": 1.0
+        },
+        {
+          "latency_bars": 1,
+          "name": "adverse",
+          "slippage_bps": 10.0,
+          "spread_multiplier": 1.5,
+          "turnover_limit": 1.0
+        },
+        {
+          "latency_bars": 2,
+          "name": "stress",
+          "slippage_bps": 20.0,
+          "spread_multiplier": 2.0,
+          "turnover_limit": 1.0
+        }
+      ],
+      "max_regression_rows": 100000,
+      "regimes": {
+        "composite_label_enabled": true,
+        "config_hash": "677d06438c34",
+        "config_name": "default_v75_regime_scheme",
+        "definition_refs": [
+          "direction",
+          "volatility",
+          "compression",
+          "shock"
+        ],
+        "definitions": [
+          {
+            "definition_name": "direction",
+            "dimension_type": "directional_context",
+            "lookback_rule": {
+              "bars": 4,
+              "feature": "direction_signal"
+            },
+            "schema_version": "regime-layer-v1",
+            "signal_key": "direction_signal",
+            "state_names": [
+              "downtrend",
+              "range",
+              "uptrend"
+            ],
+            "threshold_policy": "fixed_thresholds",
+            "threshold_values": {
+              "negative": -0.0008,
+              "positive": 0.0008
+            },
+            "unknown_label": "unknown",
+            "warmup_label": "warmup",
+            "warmup_policy": "label_as_warmup"
+          },
+          {
+            "definition_name": "volatility",
+            "dimension_type": "volatility",
+            "lookback_rule": {
+              "bars": 4,
+              "feature": "volatility_signal"
+            },
+            "schema_version": "regime-layer-v1",
+            "signal_key": "volatility_signal",
+            "state_names": [
+              "calm",
+              "normal",
+              "volatile"
+            ],
+            "threshold_policy": "fixed_thresholds",
+            "threshold_values": {
+              "high": 0.0025,
+              "low": 0.0004
+            },
+            "unknown_label": "unknown",
+            "warmup_label": "warmup",
+            "warmup_policy": "label_as_warmup"
+          },
+          {
+            "definition_name": "compression",
+            "dimension_type": "compression",
+            "lookback_rule": {
+              "bars": 3,
+              "feature": "compression_signal"
+            },
+            "schema_version": "regime-layer-v1",
+            "signal_key": "compression_signal",
+            "state_names": [
+              "compressed",
+              "balanced",
+              "expanded"
+            ],
+            "threshold_policy": "fixed_thresholds",
+            "threshold_values": {
+              "compressed": 0.0035,
+              "expanded": 0.008
+            },
+            "unknown_label": "unknown",
+            "warmup_label": "warmup",
+            "warmup_policy": "label_as_warmup"
+          },
+          {
+            "definition_name": "shock",
+            "dimension_type": "shock",
+            "lookback_rule": {
+              "bars": 1,
+              "feature": "shock_signal"
+            },
+            "schema_version": "regime-layer-v1",
+            "signal_key": "shock_signal",
+            "state_names": [
+              "normal",
+              "shock"
+            ],
+            "threshold_policy": "fixed_thresholds",
+            "threshold_values": {
+              "absolute_return": 0.008
+            },
+            "unknown_label": "unknown",
+            "warmup_label": "warmup",
+            "warmup_policy": "label_as_warmup"
+          }
+        ],
+        "enabled": true,
+        "minimum_support_rule": {
+          "dominant_state_share": 0.7,
+          "min_state_count": 2,
+          "min_state_share": 0.1
+        },
+        "schema_version": "regime-layer-v1",
+        "sidecar": {
+          "enabled": false,
+          "filename": "regime_observations.json"
+        },
+        "threshold_values": {
+          "compression": {
+            "compressed": 0.0035,
+            "expanded": 0.008
+          },
+          "direction": {
+            "negative": -0.0008,
+            "positive": 0.0008
+          },
+          "shock": {
+            "absolute_return": 0.008
+          },
+          "volatility": {
+            "high": 0.0025,
+            "low": 0.0004
+          }
+        },
+        "warning_policy": {
+          "max_unknown_share": 0.1,
+          "max_warmup_share": 0.35
+        }
+      },
+      "thresholds": {
+        "alpha": 0.01,
+        "directional_autocorr": 0.2,
+        "directional_lags": [
+          1,
+          5,
+          10,
+          20
+        ],
+        "directional_min_rejections": 2,
+        "hac_beta": 0.02,
+        "sign_edge": 0.08,
+        "variance_ratio_deviation": 0.03,
+        "variance_ratio_lags": [
+          2,
+          5,
+          10
+        ],
+        "volatility_autocorr": 0.25,
+        "volatility_lags": [
+          1,
+          5,
+          10,
+          20
+        ],
+        "volatility_min_rejections": 1
+      }
+    },
+    "dataset": {
+      "cache_enabled": true,
+      "format": "csv",
+      "path": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/Datasets/Volatility 75 Index_M1_201901010502_202603122158.csv"
+    },
+    "outputs": {
+      "keep_plots": true,
+      "root": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/Randomness and Inefficiencies Detector/artifacts/manual-runs"
+    },
+    "reporting": {
+      "detail_level": "standard"
+    },
+    "tool": {
+      "detector_root": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/Randomness and Inefficiencies Detector",
+      "verdicts": {
+        "no_actionable": "NoActionableInefficiency",
+        "supported_candidate": "CandidateInefficiency",
+        "weak_evidence": "WeakEvidence"
+      },
+      "version": "0.1.0"
+    }
+  },
+  "dataset_hash": "fbe19e4e87243de3655c1ce6945ccdce03cc20b47c14db3a15fc18519ce2fd59",
+  "dataset_path": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/Datasets/Volatility 75 Index_M1_201901010502_202603122158.csv",
+  "era_scheme": "default_chronological",
+  "output_path": "/home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/ai-hedge-fund/Randomness and Inefficiencies Detector/artifacts/manual-runs/2026/03/13/rid-20260313-145143-volatility-75-index_-a9d50168",
+  "row_count": 3782647,
+  "run_id": "rid-20260313-145143-volatility-75-index_-a9d50168",
+  "scenario_set": [
+    "baseline",
+    "adverse",
+    "stress"
+  ],
+  "started_at": "2026-03-13T14:51:43.807370+00:00",
+  "status": "Running",
+  "tool_version": "0.1.0"
+}

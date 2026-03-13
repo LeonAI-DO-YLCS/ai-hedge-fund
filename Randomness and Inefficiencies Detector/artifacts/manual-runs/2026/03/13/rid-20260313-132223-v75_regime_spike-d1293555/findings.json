@@ -1,0 +1,209 @@
+{
+  "findings": [
+    {
+      "category": "DataQuality",
+      "confidence_level": "High",
+      "decision_weight": "High",
+      "effect_direction": "NotApplicable",
+      "effect_size": 0.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "data-quality-overview",
+      "notes": "Dataset passed configured quality checks.",
+      "scenario_refs": [],
+      "status": "Supported",
+      "title": "Dataset quality assessment"
+    },
+    {
+      "category": "ScopeGuardrail",
+      "confidence_level": "High",
+      "decision_weight": "High",
+      "effect_direction": "NotApplicable",
+      "effect_size": 0.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "scope-guardrail",
+      "notes": "The detector uses detector-local outputs and read-only external dataset access.",
+      "scenario_refs": [],
+      "status": "Supported",
+      "title": "Repository boundary preserved"
+    },
+    {
+      "category": "RegimeStructure",
+      "confidence_level": "Medium",
+      "decision_weight": "Medium",
+      "effect_direction": "Neutral",
+      "effect_size": 1.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "regime-warning-direction-missing-downtrend",
+      "notes": "MissingState: downtrend",
+      "scenario_refs": [],
+      "status": "Warning",
+      "title": "direction regime coverage warning"
+    },
+    {
+      "category": "RegimeStructure",
+      "confidence_level": "Medium",
+      "decision_weight": "Medium",
+      "effect_direction": "Neutral",
+      "effect_size": 1.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "regime-warning-volatility-missing-normal",
+      "notes": "MissingState: normal",
+      "scenario_refs": [],
+      "status": "Warning",
+      "title": "volatility regime coverage warning"
+    },
+    {
+      "category": "RegimeStructure",
+      "confidence_level": "Medium",
+      "decision_weight": "Medium",
+      "effect_direction": "Neutral",
+      "effect_size": 1.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "regime-warning-compression-missing-expanded",
+      "notes": "MissingState: expanded",
+      "scenario_refs": [],
+      "status": "Warning",
+      "title": "compression regime coverage warning"
+    },
+    {
+      "category": "RegimeStructure",
+      "confidence_level": "Medium",
+      "decision_weight": "Medium",
+      "effect_direction": "Neutral",
+      "effect_size": 1.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "regime-warning-shock-sparse-shock",
+      "notes": "SparseCoverage: shock",
+      "scenario_refs": [],
+      "status": "Warning",
+      "title": "shock regime coverage warning"
+    },
+    {
+      "category": "RegimeStructure",
+      "confidence_level": "Medium",
+      "decision_weight": "Medium",
+      "effect_direction": "Neutral",
+      "effect_size": 1.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "regime-warning-shock-dominant-normal",
+      "notes": "DominantCoverage: normal",
+      "scenario_refs": [],
+      "status": "Warning",
+      "title": "shock regime coverage warning"
+    },
+    {
+      "category": "DirectionalPredictability",
+      "confidence_level": "Low",
+      "decision_weight": "High",
+      "effect_direction": "Negative",
+      "effect_size": 1.339691,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "directional-full",
+      "gross_edge": 1.339691,
+      "notes": "lag1_autocorr=-0.1084, sign_agreement=0.9000, fdr_rejections=2, max_vr_deviation=1.3397, max_abs_beta=0.0000, rows_used=12/12",
+      "scenario_refs": [],
+      "status": "Supported",
+      "title": "Directional predictability in full"
+    },
+    {
+      "category": "VolatilityPredictability",
+      "confidence_level": "Low",
+      "decision_weight": "Medium",
+      "effect_direction": "Neutral",
+      "effect_size": 0.103073,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "volatility-full",
+      "notes": "abs_return_autocorr=-0.1031, fdr_rejections=0, arch_lm_pvalue=0.7265284545708147, rows_used=12/12",
+      "scenario_refs": [],
+      "status": "Rejected",
+      "title": "Volatility persistence in full"
+    },
+    {
+      "category": "Tradability",
+      "confidence_level": "Medium",
+      "decision_weight": "High",
+      "effect_direction": "Positive",
+      "effect_size": 1.332229,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "tradability-baseline-full",
+      "notes": "gross_edge=1.3397, penalty=0.0075",
+      "scenario_refs": [
+        "baseline"
+      ],
+      "status": "Supported",
+      "title": "Tradability under baseline"
+    },
+    {
+      "category": "Tradability",
+      "confidence_level": "Medium",
+      "decision_weight": "High",
+      "effect_direction": "Positive",
+      "effect_size": 1.327998,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "tradability-adverse-full",
+      "notes": "gross_edge=1.3397, penalty=0.0117",
+      "scenario_refs": [
+        "adverse"
+      ],
+      "status": "Supported",
+      "title": "Tradability under adverse"
+    },
+    {
+      "category": "Tradability",
+      "confidence_level": "Medium",
+      "decision_weight": "High",
+      "effect_direction": "Positive",
+      "effect_size": 1.322767,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "tradability-stress-full",
+      "notes": "gross_edge=1.3397, penalty=0.0169",
+      "scenario_refs": [
+        "stress"
+      ],
+      "status": "Supported",
+      "title": "Tradability under stress"
+    },
+    {
+      "category": "Stability",
+      "confidence_level": "Low",
+      "decision_weight": "High",
+      "effect_direction": "Neutral",
+      "effect_size": 1.0,
+      "era_refs": [
+        "full"
+      ],
+      "finding_id": "stability-check",
+      "notes": "supported_directional_eras=1",
+      "scenario_refs": [],
+      "status": "Rejected",
+      "title": "Cross-era stability validation"
+    }
+  ],
+  "recommended_next_step": "ContinueDescriptiveResearch",
+  "scope_guardrail_status": "Pass",
+  "verdict": "WeakEvidence"
+}

@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+reports/runs/*
+!reports/runs/.gitkeep
+artifacts/cache/*
+!artifacts/cache/.gitkeep
+logs/*
+!logs/.gitkeep
+config/local.yaml
+*.tmp

@@ -1,0 +1,24 @@
+dataset:
+  path: /absolute/path/to/alternate-v75-dataset.csv
+
+outputs:
+  root: reports/runs
+
+analysis:
+  era_scheme:
+    name: local_override_scheme
+    exploratory_ratio: 0.50
+    validation_ratio: 0.25
+    holdout_ratio: 0.25
+    minimum_rows_per_era: 20
+  regimes:
+    enabled: true
+    config_name: local_regime_override
+    warning_policy:
+      max_warmup_share: 0.30
+    sidecar:
+      enabled: true
+      filename: local_regime_observations.json
+
+reporting:
+  detail_level: detailed

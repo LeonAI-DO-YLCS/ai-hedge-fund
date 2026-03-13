@@ -1,0 +1,27 @@
+{
+  "mode": "without_skill",
+  "expected_trigger": true,
+  "trigger_rate": 1.0,
+  "trigger_pass": true,
+  "artifact_pass_rate": 0.0,
+  "artifact_pass": false,
+  "overall_pass": false,
+  "required_artifacts": [
+    "tokens/tokens.source.json",
+    "specs/design-system-spec.md",
+    "specs/component-specs.md",
+    "docs/usage-guide.md",
+    "docs/governance.md",
+    "docs/a11y-conformance-matrix.md",
+    "sample-app/src/components/Button.tsx"
+  ],
+  "artifact_coverage": {
+    "tokens/tokens.source.json": 0.0,
+    "specs/design-system-spec.md": 0.0,
+    "specs/component-specs.md": 0.0,
+    "docs/usage-guide.md": 0.0,
+    "docs/governance.md": 0.0,
+    "docs/a11y-conformance-matrix.md": 0.0,
+    "sample-app/src/components/Button.tsx": 0.0
+  }
+}

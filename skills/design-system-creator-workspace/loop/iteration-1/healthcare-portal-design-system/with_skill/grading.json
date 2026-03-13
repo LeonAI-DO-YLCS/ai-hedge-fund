@@ -1,0 +1,29 @@
+{
+  "mode": "with_skill",
+  "expected_trigger": true,
+  "trigger_rate": 1.0,
+  "trigger_pass": true,
+  "artifact_pass_rate": 1.0,
+  "artifact_pass": true,
+  "overall_pass": true,
+  "required_artifacts": [
+    "tokens/tokens.source.json",
+    "specs/design-system-spec.md",
+    "specs/component-specs.md",
+    "docs/usage-guide.md",
+    "docs/governance.md",
+    "docs/a11y-conformance-matrix.md",
+    "sample-app/package.json",
+    "sample-app/src/main.tsx"
+  ],
+  "artifact_coverage": {
+    "tokens/tokens.source.json": 1.0,
+    "specs/design-system-spec.md": 1.0,
+    "specs/component-specs.md": 1.0,
+    "docs/usage-guide.md": 1.0,
+    "docs/governance.md": 1.0,
+    "docs/a11y-conformance-matrix.md": 1.0,
+    "sample-app/package.json": 1.0,
+    "sample-app/src/main.tsx": 1.0
+  }
+}
