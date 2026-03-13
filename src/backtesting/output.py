@@ -45,6 +45,20 @@ class OutputBuilder:
 
             action = decisions.get(ticker, {}).get("action", "hold")
             quantity = executed_trades.get(ticker, 0)
+            price = current_prices[ticker]
+            execution_result = portfolio.get_last_execution_result(ticker)
+            if execution_result:
+                quantity = execution_result.get("filled_quantity", quantity)
+                price = execution_result.get("filled_price") or price
+                status = execution_result.get("status")
+                requested_qty = decisions.get(ticker, {}).get("quantity", quantity)
+                if status == "partial_fill" and requested_qty != quantity:
+                    action = f"{action} (partial)"
+                elif (
+                    status in {"rejected", "failed"}
+                    and decisions.get(ticker, {}).get("action", "hold") != "hold"
+                ):
+                    action = f"{action} ({status})"
 
             date_rows.append(
                 format_backtest_row(
@@ -52,7 +66,7 @@ class OutputBuilder:
                     ticker=ticker,
                     action=action,
                     quantity=quantity,
-                    price=current_prices[ticker],
+                    price=price,
                     long_shares=pos["long"],
                     short_shares=pos["short"],
                     position_value=net_position_value,
@@ -60,7 +74,9 @@ class OutputBuilder:
             )
 
         # Summary row
-        initial_value = self._initial_capital if self._initial_capital is not None else total_value
+        initial_value = (
+            self._initial_capital if self._initial_capital is not None else total_value
+        )
         summary = compute_portfolio_summary(
             portfolio=portfolio,
             total_value=total_value,
@@ -94,5 +110,3 @@ class OutputBuilder:
 
     def print_rows(self, rows: List[list]) -> None:
         print_backtest_results(rows)
-
-

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from typing import Dict, Mapping
+from typing import Dict, Mapping, cast
 from types import MappingProxyType
 
-from .types import PortfolioSnapshot, PositionState, TickerRealizedGains
+from .types import (
+    ActionLiteral,
+    PortfolioSnapshot,
+    PositionState,
+    TickerRealizedGains,
+    TradeExecutionResult,
+)
 
 
 class Portfolio:
@@ -36,10 +42,10 @@ class Portfolio:
                 for ticker in tickers
             },
             "realized_gains": {
-                ticker: {"long": 0.0, "short": 0.0}
-                for ticker in tickers
+                ticker: {"long": 0.0, "short": 0.0} for ticker in tickers
             },
         }
+        self._last_execution_results: dict[str, TradeExecutionResult] = {}
 
     def get_snapshot(self) -> PortfolioSnapshot:
         positions_copy: Dict[str, PositionState] = {
@@ -79,68 +85,70 @@ class Portfolio:
     def get_realized_gains(self) -> Mapping[str, TickerRealizedGains]:
         return MappingProxyType(self._portfolio["realized_gains"])  # type: ignore[arg-type]
 
-    def apply_long_buy(self, ticker: str, quantity: float, price: float) -> float:
+    def record_execution_result(
+        self, ticker: str, result: TradeExecutionResult
+    ) -> None:
+        self._last_execution_results[ticker] = cast(TradeExecutionResult, dict(result))
+
+    def get_last_execution_result(self, ticker: str) -> TradeExecutionResult | None:
+        result = self._last_execution_results.get(ticker)
+        if result is None:
+            return None
+        return cast(TradeExecutionResult, dict(result))
+
+    def _apply_long_buy_internal(
+        self, ticker: str, quantity: float, price: float, *, enforce_cash: bool
+    ) -> float:
         if quantity <= 0:
             return 0.0
         quantity = float(quantity)
         position = self._portfolio["positions"][ticker]
-        
-        affordable_qty = self._portfolio["cash"] / price if price > 0 else 0.0
-        executed_qty = min(quantity, affordable_qty)
-        
+
+        executed_qty = quantity
+        if enforce_cash:
+            affordable_qty = self._portfolio["cash"] / price if price > 0 else 0.0
+            executed_qty = min(quantity, affordable_qty)
+
         if executed_qty <= 0:
             return 0.0
-            
+
         cost = executed_qty * price
         old_shares = position["long"]
         old_cost_basis = position["long_cost_basis"]
         total_shares = old_shares + executed_qty
-        
+
         if total_shares > 0:
             total_old_cost = old_cost_basis * old_shares
             total_new_cost = cost
-            position["long_cost_basis"] = (total_old_cost + total_new_cost) / total_shares
-            
+            position["long_cost_basis"] = (
+                total_old_cost + total_new_cost
+            ) / total_shares
+
         position["long"] = total_shares
         self._portfolio["cash"] -= cost
         return executed_qty
 
-    def apply_long_sell(self, ticker: str, quantity: float, price: float) -> float:
-        if quantity <= 0:
-            return 0.0
-        quantity = float(quantity)
-        position = self._portfolio["positions"][ticker]
-        
-        executed_qty = min(quantity, position["long"])
-        if executed_qty <= 0:
-            return 0.0
-            
-        avg_cost = position["long_cost_basis"]
-        realized_gain = (price - avg_cost) * executed_qty
-        self._portfolio["realized_gains"][ticker]["long"] += realized_gain
-        
-        position["long"] -= executed_qty
-        self._portfolio["cash"] += executed_qty * price
-        
-        if position["long"] < 1e-8:
-            position["long"] = 0.0
-            position["long_cost_basis"] = 0.0
-            
-        return executed_qty
-
-    def apply_short_open(self, ticker: str, quantity: float, price: float) -> float:
+    def _apply_short_open_internal(
+        self, ticker: str, quantity: float, price: float, *, enforce_margin: bool
+    ) -> float:
         if quantity <= 0:
             return 0.0
         quantity = float(quantity)
         position = self._portfolio["positions"][ticker]
 
+        executed_qty = quantity
         margin_ratio = self._portfolio["margin_requirement"]
-        affordable_qty = self._portfolio["cash"] / (price * margin_ratio) if margin_ratio > 0 and price > 0 else 0.0
-        executed_qty = min(quantity, affordable_qty)
-        
+        if enforce_margin:
+            affordable_qty = (
+                self._portfolio["cash"] / (price * margin_ratio)
+                if margin_ratio > 0 and price > 0
+                else 0.0
+            )
+            executed_qty = min(quantity, affordable_qty)
+
         if executed_qty <= 0:
             return 0.0
-            
+
         proceeds = price * executed_qty
         margin_required = proceeds * margin_ratio
 
@@ -151,46 +159,96 @@ class Portfolio:
         if total_shares > 0:
             total_old_cost = old_cost_basis * old_short_shares
             total_new_cost = proceeds
-            position["short_cost_basis"] = (total_old_cost + total_new_cost) / total_shares
-            
+            position["short_cost_basis"] = (
+                total_old_cost + total_new_cost
+            ) / total_shares
+
         position["short"] = total_shares
         position["short_margin_used"] += margin_required
         self._portfolio["margin_used"] += margin_required
         self._portfolio["cash"] += proceeds
         self._portfolio["cash"] -= margin_required
-        
+
         return executed_qty
+
+    def apply_long_buy(self, ticker: str, quantity: float, price: float) -> float:
+        return self._apply_long_buy_internal(ticker, quantity, price, enforce_cash=True)
+
+    def apply_long_sell(self, ticker: str, quantity: float, price: float) -> float:
+        if quantity <= 0:
+            return 0.0
+        quantity = float(quantity)
+        position = self._portfolio["positions"][ticker]
+
+        executed_qty = min(quantity, position["long"])
+        if executed_qty <= 0:
+            return 0.0
+
+        avg_cost = position["long_cost_basis"]
+        realized_gain = (price - avg_cost) * executed_qty
+        self._portfolio["realized_gains"][ticker]["long"] += realized_gain
+
+        position["long"] -= executed_qty
+        self._portfolio["cash"] += executed_qty * price
+
+        if position["long"] < 1e-8:
+            position["long"] = 0.0
+            position["long_cost_basis"] = 0.0
+
+        return executed_qty
+
+    def apply_short_open(self, ticker: str, quantity: float, price: float) -> float:
+        return self._apply_short_open_internal(
+            ticker, quantity, price, enforce_margin=True
+        )
 
     def apply_short_cover(self, ticker: str, quantity: float, price: float) -> float:
         if quantity <= 0:
             return 0.0
         quantity = float(quantity)
         position = self._portfolio["positions"][ticker]
-        
+
         executed_qty = min(quantity, position["short"])
         if executed_qty <= 0:
             return 0.0
-            
+
         cover_cost = executed_qty * price
         avg_short_price = position["short_cost_basis"]
         realized_gain = (avg_short_price - price) * executed_qty
-        
+
         portion = executed_qty / position["short"] if position["short"] > 0 else 1.0
         margin_to_release = portion * position["short_margin_used"]
-        
+
         position["short"] -= executed_qty
         position["short_margin_used"] -= margin_to_release
         self._portfolio["margin_used"] -= margin_to_release
         self._portfolio["cash"] += margin_to_release
         self._portfolio["cash"] -= cover_cost
         self._portfolio["realized_gains"][ticker]["short"] += realized_gain
-        
+
         if position["short"] < 1e-8:
             residual_margin = position["short_margin_used"]
             self._portfolio["margin_used"] -= residual_margin
             position["short"] = 0.0
             position["short_cost_basis"] = 0.0
             position["short_margin_used"] = 0.0
-            
+
         return executed_qty
 
+    def reconcile_live_fill(
+        self, ticker: str, action: ActionLiteral, quantity: float, price: float
+    ) -> float:
+        action_key = str(action).lower().strip()
+        if action_key == "buy":
+            return self._apply_long_buy_internal(
+                ticker, quantity, price, enforce_cash=False
+            )
+        if action_key == "sell":
+            return self.apply_long_sell(ticker, quantity, price)
+        if action_key == "short":
+            return self._apply_short_open_internal(
+                ticker, quantity, price, enforce_margin=False
+            )
+        if action_key == "cover":
+            return self.apply_short_cover(ticker, quantity, price)
+        return 0.0

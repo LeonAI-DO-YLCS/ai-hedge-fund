@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from src.tools.mt5_client import MT5BridgeClient
+from src.tools.provider_config import (
+    get_mt5_bridge_url,
+    get_mt5_connection_profile,
+    get_mt5_profile_hint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,74 +19,22 @@ def _utc_now_iso() -> str:
 
 
 class MT5BridgeService:
-    """Adapter service to expose MT5 bridge information to backend/UI callers."""
-
-    _TICKER_RE = re.compile(r"^\s{2}([A-Za-z0-9_.-]+):\s*$")
-    _FIELD_RE = re.compile(r"^\s{4}(mt5_symbol|lot_size|category):\s*(.+?)\s*$")
+    """Adapter service to expose MT5 bridge information to backend callers."""
 
     def __init__(self) -> None:
         self._client = MT5BridgeClient()
 
+    def _bridge_unavailable_error(self, reason: str) -> str:
+        bridge_url = get_mt5_bridge_url()
+        hint = get_mt5_profile_hint(bridge_url)
+        message = f"{reason} (configured bridge URL: {bridge_url}; profile: {get_mt5_connection_profile(bridge_url)})."
+        if hint:
+            message = f"{message} {hint}"
+        return message
+
     @staticmethod
-    def _repo_root() -> Path:
-        return Path(__file__).resolve().parents[3]
-
-    def _symbols_file(self) -> Path:
-        return self._repo_root() / "mt5-connection-bridge" / "config" / "symbols.yaml"
-
-    @staticmethod
-    def _clean_value(raw: str) -> str:
-        value = raw.split("#", 1)[0].strip()
-        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-            return value[1:-1]
-        return value
-
-    def _load_symbol_entries(self) -> list[dict[str, Any]]:
-        symbols_path = self._symbols_file()
-        if not symbols_path.exists():
-            logger.warning("symbols.yaml not found at %s", symbols_path)
-            return []
-
-        entries: list[dict[str, Any]] = []
-        current: dict[str, Any] | None = None
-
-        for line in symbols_path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-
-            ticker_match = self._TICKER_RE.match(line)
-            if ticker_match:
-                if current:
-                    entries.append(current)
-                current = {
-                    "ticker": ticker_match.group(1).upper(),
-                    "mt5_symbol": None,
-                    "category": "unknown",
-                    "lot_size": None,
-                    "enabled": True,
-                    "source": "symbols_yaml",
-                    "runtime_status": "unknown",
-                }
-                continue
-
-            field_match = self._FIELD_RE.match(line)
-            if field_match and current is not None:
-                key, value = field_match.groups()
-                value = self._clean_value(value)
-                if key == "lot_size":
-                    try:
-                        current[key] = float(value)
-                    except ValueError:
-                        current[key] = None
-                else:
-                    current[key] = value
-
-        if current:
-            entries.append(current)
-
-        # Drop malformed entries without ticker/mt5_symbol
-        return [e for e in entries if e.get("ticker") and e.get("mt5_symbol")]
+    def _is_error_payload(payload: dict[str, Any]) -> bool:
+        return bool(payload.get("detail"))
 
     def get_connection_status(self) -> dict[str, Any]:
         now = _utc_now_iso()
@@ -96,18 +47,23 @@ class MT5BridgeService:
         connected = bool(payload.get("connected", False))
         authorized = bool(payload.get("authorized", False))
 
-        # Handle explicit API errors from the bridge
-        if "detail" in payload and not connected:
-            error_val = payload.get("detail", str(payload))
-            default_error = f"Bridge Error: {error_val}"
+        if not payload:
+            error = self._bridge_unavailable_error("Bridge unreachable")
             status = "unavailable"
-        elif not payload:
-            from src.tools.provider_config import get_mt5_bridge_url
-            default_error = f"Bridge unreachable at {get_mt5_bridge_url()}. Check network or URL."
+        elif self._is_error_payload(payload) and not connected:
+            error = self._bridge_unavailable_error(
+                f"Bridge Error: {payload.get('detail')}"
+            )
             status = "unavailable"
         else:
-            default_error = None if connected else "MT5 bridge unavailable"
-            status = "ready" if connected and authorized else ("degraded" if connected else "unavailable")
+            error = payload.get("error")
+            status = (
+                "ready"
+                if connected and authorized
+                else ("degraded" if connected else "unavailable")
+            )
+            if status == "unavailable" and not error:
+                error = self._bridge_unavailable_error("MT5 bridge unavailable")
 
         return {
             "status": status,
@@ -118,56 +74,160 @@ class MT5BridgeService:
             "balance": payload.get("balance"),
             "latency_ms": payload.get("latency_ms"),
             "last_checked_at": now,
-            "error": payload.get("error") or default_error,
+            "error": error,
         }
 
-    def get_symbols(self, category: str | None = None, enabled_only: bool = True) -> dict[str, Any]:
-        entries = self._load_symbol_entries()
+    def get_symbols(
+        self, category: str | None = None, enabled_only: bool = True
+    ) -> dict[str, Any]:
         connection = self.get_connection_status()
+        try:
+            payload = self._client.get_symbols_catalog() or {}
+        except Exception as exc:
+            logger.warning("MT5 symbols request failed: %s", exc)
+            payload = {}
 
-        runtime_status = "connected" if connection.get("connected") else "bridge_unavailable"
-        for entry in entries:
-            entry["runtime_status"] = runtime_status
+        raw_symbols = (
+            payload.get("symbols", [])
+            if isinstance(payload.get("symbols", []), list)
+            else []
+        )
+        runtime_status = (
+            "connected" if connection.get("connected") else "bridge_unavailable"
+        )
+        entries: list[dict[str, Any]] = []
+        for item in raw_symbols:
+            if not isinstance(item, dict):
+                continue
+            entry = {
+                "ticker": item.get("ticker"),
+                "mt5_symbol": item.get("mt5_symbol"),
+                "category": item.get("category", "unknown"),
+                "lot_size": item.get("lot_size"),
+                "enabled": True,
+                "source": "bridge",
+                "runtime_status": runtime_status,
+            }
+            entries.append(entry)
 
         if category:
-            c = category.strip().lower()
-            entries = [e for e in entries if str(e.get("category", "")).lower() == c]
+            category_key = category.strip().lower()
+            entries = [
+                entry
+                for entry in entries
+                if str(entry.get("category", "")).lower() == category_key
+            ]
 
         if enabled_only:
-            entries = [e for e in entries if bool(e.get("enabled", False))]
+            entries = [entry for entry in entries if bool(entry.get("enabled", False))]
 
-        entries.sort(key=lambda e: str(e.get("ticker", "")))
-        status = "ready" if entries else "degraded"
+        entries.sort(key=lambda entry: str(entry.get("ticker", "")))
+        if self._is_error_payload(payload):
+            status = "unavailable"
+            error = self._bridge_unavailable_error(
+                f"Bridge Error: {payload.get('detail')}"
+            )
+        elif entries:
+            status = "ready" if connection.get("connected") else "degraded"
+            error = connection.get("error") if status != "ready" else None
+        else:
+            status = "unavailable" if not payload else "degraded"
+            error = connection.get("error") or "No symbols available from MT5 bridge"
 
         return {
             "status": status,
             "symbols": entries,
             "count": len(entries),
             "last_refreshed_at": _utc_now_iso(),
-            "error": None if entries else "No symbols configured",
+            "error": error,
         }
 
     def get_metrics(self) -> dict[str, Any]:
-        """Fetch health/telemetry metrics from the MT5 bridge."""
         try:
             payload = self._client.get_metrics() or {}
         except Exception as exc:
             logger.warning("MT5 metrics check failed: %s", exc)
             payload = {}
-        
-        # Determine status. If payload exists and uptime > 0, we can assume it's running
+
         uptime = float(payload.get("uptime_seconds", 0.0))
-        status = "ready" if uptime > 0 else "unavailable"
-        
+        ready = uptime > 0 and not self._is_error_payload(payload)
         return {
-            "status": status,
+            "status": "ready" if ready else "unavailable",
             "uptime_seconds": uptime,
             "total_requests": int(payload.get("total_requests", 0)),
             "requests_by_endpoint": payload.get("requests_by_endpoint", {}),
             "errors_count": int(payload.get("errors_count", 0)),
             "last_request_at": payload.get("last_request_at"),
             "retention_days": int(payload.get("retention_days", 1)),
-            "error": "Failed to fetch MT5 bridge metrics" if not payload else None,
+            "error": None
+            if ready
+            else self._bridge_unavailable_error("Failed to fetch MT5 bridge metrics"),
+        }
+
+    def get_logs(self, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+        try:
+            payload = self._client.get_logs(limit=limit, offset=offset) or {}
+        except Exception as exc:
+            logger.warning("MT5 logs request failed: %s", exc)
+            payload = {}
+
+        entries = (
+            payload.get("entries", [])
+            if isinstance(payload.get("entries", []), list)
+            else []
+        )
+        ready = bool(payload) and not self._is_error_payload(payload)
+        return {
+            "status": "ready" if ready else "unavailable",
+            "total": int(payload.get("total", 0)),
+            "offset": int(payload.get("offset", offset)),
+            "limit": int(payload.get("limit", limit)),
+            "entries": entries,
+            "error": None
+            if ready
+            else self._bridge_unavailable_error("Failed to fetch MT5 bridge logs"),
+        }
+
+    def get_runtime_diagnostics(self) -> dict[str, Any]:
+        try:
+            payload = self._client.get_runtime_diagnostics() or {}
+        except Exception as exc:
+            logger.warning("MT5 runtime diagnostics request failed: %s", exc)
+            payload = {}
+
+        ready = bool(payload) and not self._is_error_payload(payload)
+        return {
+            "status": "ready" if ready else "unavailable",
+            "diagnostics": payload,
+            "error": None
+            if ready
+            else self._bridge_unavailable_error(
+                "Failed to fetch MT5 runtime diagnostics"
+            ),
+        }
+
+    def get_symbol_diagnostics(self) -> dict[str, Any]:
+        try:
+            payload = self._client.get_symbol_diagnostics() or {}
+        except Exception as exc:
+            logger.warning("MT5 symbol diagnostics request failed: %s", exc)
+            payload = {}
+
+        ready = bool(payload) and not self._is_error_payload(payload)
+        return {
+            "status": "ready" if ready else "unavailable",
+            "generated_at": payload.get("generated_at"),
+            "worker_state": payload.get("worker_state"),
+            "configured_symbols": int(payload.get("configured_symbols", 0)),
+            "checked_count": int(payload.get("checked_count", 0)),
+            "items": payload.get("items", [])
+            if isinstance(payload.get("items", []), list)
+            else [],
+            "error": None
+            if ready
+            else self._bridge_unavailable_error(
+                "Failed to fetch MT5 symbol diagnostics"
+            ),
         }
 
 

@@ -1,6 +1,9 @@
 # Git
 .git
+.git/
 .gitignore
+.dockerignore
+Dockerfile*
 
 # Poetry
 .venv
@@ -24,6 +27,7 @@ __pycache__/
 logs/
 data/
 *.log
+*.log*
 coverage/
 dist/
 build/

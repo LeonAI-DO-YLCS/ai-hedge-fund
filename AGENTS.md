@@ -61,6 +61,8 @@ Before finalizing your output, silently verify:
 - Versioned Markdown files under `Randomness and Inefficiencies Detector/docs/planning/` and planning artifacts under `specs/003-v75-strategy-planning/` (003-v75-strategy-planning)
 - Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, rich, pytest (004-detector-regimes)
 - File-based detector-local outputs only; read-only external CSV input, detector-local manifests, JSON metrics, JSON findings, Markdown reports, optional sidecar artifact files for bar-level regime observations (004-detector-regimes)
+- Python 3.11+ + FastAPI, Pydantic, requests, pandas, pytest, MetaTrader5 runtime worker on the Windows-native bridge, PyYAML-backed symbol configuration (008-close-mt5-gaps)
+- File-based configuration and logs (`.env`, YAML symbol mappings, JSONL operational logs), plus in-memory runtime state; no new database (008-close-mt5-gaps)
 
 ## Recent Changes
 - 002-validate-v75-plan: Added Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, pytest
