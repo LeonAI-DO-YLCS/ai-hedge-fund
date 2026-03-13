@@ -1,0 +1,452 @@
+{
+  "data_quality": {
+    "duplicate_count": 0,
+    "gap_summary": {},
+    "invalid_ohlc_count": 0,
+    "nonpositive_price_count": 0,
+    "quality_notes": [],
+    "quality_status": "Pass",
+    "spread_summary": {
+      "max": 0.12,
+      "median": 0.065,
+      "min": 0.05,
+      "unique_count": 3
+    },
+    "tick_volume_summary": {
+      "max": 42.0,
+      "median": 36.5,
+      "min": 35.0,
+      "unique_count": 3
+    }
+  },
+  "directional_tests": {
+    "full": {
+      "fdr": {
+        "adjusted_pvalues": {
+          "return_lb_1": 0.8014250502084491,
+          "return_lb_5": 0.9152134985514666,
+          "runs_test": 0.015654247067221613,
+          "sign_lb_1": 0.01439053857959117,
+          "sign_lb_5": 0.015654247067221613,
+          "variance_ratio_2": 0.0007915071720768774,
+          "variance_ratio_5": 0.0
+        },
+        "alpha": 0.01,
+        "rejected_count": 2,
+        "rejections": {
+          "return_lb_1": false,
+          "return_lb_5": false,
+          "runs_test": false,
+          "sign_lb_1": false,
+          "sign_lb_5": false,
+          "variance_ratio_2": true,
+          "variance_ratio_5": true
+        }
+      },
+      "gross_edge": 1.339691,
+      "lag1_autocorr": -0.108355,
+      "original_rows": 12,
+      "predictive_regression": {
+        "adj_r2": null,
+        "coefficients": {},
+        "max_abs_beta": null,
+        "min_pvalue": null,
+        "original_rows": 10,
+        "pvalues": {},
+        "rows_used": 10
+      },
+      "return_ljung_box": {
+        "1": {
+          "lb_pvalue": 0.6869357573215278,
+          "lb_stat": 0.16242265966774455
+        },
+        "10": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "20": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "5": {
+          "lb_pvalue": 0.9152134985514666,
+          "lb_stat": 1.4813363056680398
+        }
+      },
+      "rows_used": 12,
+      "runs_test": {
+        "pvalue": 0.01118160504801544,
+        "z_stat": -2.536971519311148
+      },
+      "sign_agreement": 0.9,
+      "sign_ljung_box": {
+        "1": {
+          "lb_pvalue": 0.006167373676967644,
+          "lb_stat": 7.5007373737373735
+        },
+        "10": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "20": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "5": {
+          "lb_pvalue": 0.010948843261567427,
+          "lb_stat": 14.86636968895302
+        }
+      },
+      "variance_ratio": {
+        "10": {
+          "pvalue": null,
+          "stat": null,
+          "vr": null
+        },
+        "2": {
+          "pvalue": 0.00022614490630767925,
+          "stat": 3.687863495343581,
+          "vr": 1.1918956384169668
+        },
+        "5": {
+          "pvalue": 0.0,
+          "stat": 12.161714431310626,
+          "vr": 2.3396908438009607
+        }
+      }
+    }
+  },
+  "eda_summary": {
+    "return_distribution": {
+      "kurtosis": 10.712330334243568,
+      "mean": 0.000940384897545857,
+      "negative_ratio": 0.45454545454545453,
+      "positive_ratio": 0.5454545454545454,
+      "skew": 3.25667664527694,
+      "std": 0.0036577476883460115
+    },
+    "rolling": {
+      "mean_max": 0.0014660738578259336,
+      "mean_min": 0.0012180667131382883,
+      "std_max": 0.00433473298873345,
+      "std_median": 0.004287756549031491,
+      "window": 8
+    },
+    "time_of_day": {
+      "0": {
+        "mean_abs_return": 0.001408,
+        "mean_return": 0.00094
+      }
+    },
+    "weekday": {
+      "Tuesday": {
+        "mean_abs_return": 0.001408,
+        "mean_return": 0.00094
+      }
+    }
+  },
+  "final_scores": {
+    "verdict": "WeakEvidence"
+  },
+  "regime_classification": {
+    "config_hash": "677d06438c34",
+    "config_name": "default_v75_regime_scheme",
+    "sidecar": {
+      "emitted": false,
+      "filename": "regime_observations.json",
+      "observation_count": 0,
+      "path": null
+    },
+    "status": "warning"
+  },
+  "regime_definitions": [
+    {
+      "definition_name": "direction",
+      "dimension_type": "directional_context",
+      "lookback_rule": {
+        "bars": 4,
+        "feature": "direction_signal"
+      },
+      "schema_version": "regime-layer-v1",
+      "signal_key": "direction_signal",
+      "state_names": [
+        "downtrend",
+        "range",
+        "uptrend"
+      ],
+      "threshold_policy": "fixed_thresholds",
+      "threshold_values": {
+        "negative": -0.0008,
+        "positive": 0.0008
+      },
+      "unknown_label": "unknown",
+      "warmup_label": "warmup",
+      "warmup_policy": "label_as_warmup"
+    },
+    {
+      "definition_name": "volatility",
+      "dimension_type": "volatility",
+      "lookback_rule": {
+        "bars": 4,
+        "feature": "volatility_signal"
+      },
+      "schema_version": "regime-layer-v1",
+      "signal_key": "volatility_signal",
+      "state_names": [
+        "calm",
+        "normal",
+        "volatile"
+      ],
+      "threshold_policy": "fixed_thresholds",
+      "threshold_values": {
+        "high": 0.0025,
+        "low": 0.0004
+      },
+      "unknown_label": "unknown",
+      "warmup_label": "warmup",
+      "warmup_policy": "label_as_warmup"
+    },
+    {
+      "definition_name": "compression",
+      "dimension_type": "compression",
+      "lookback_rule": {
+        "bars": 3,
+        "feature": "compression_signal"
+      },
+      "schema_version": "regime-layer-v1",
+      "signal_key": "compression_signal",
+      "state_names": [
+        "compressed",
+        "balanced",
+        "expanded"
+      ],
+      "threshold_policy": "fixed_thresholds",
+      "threshold_values": {
+        "compressed": 0.0035,
+        "expanded": 0.008
+      },
+      "unknown_label": "unknown",
+      "warmup_label": "warmup",
+      "warmup_policy": "label_as_warmup"
+    },
+    {
+      "definition_name": "shock",
+      "dimension_type": "shock",
+      "lookback_rule": {
+        "bars": 1,
+        "feature": "shock_signal"
+      },
+      "schema_version": "regime-layer-v1",
+      "signal_key": "shock_signal",
+      "state_names": [
+        "normal",
+        "shock"
+      ],
+      "threshold_policy": "fixed_thresholds",
+      "threshold_values": {
+        "absolute_return": 0.008
+      },
+      "unknown_label": "unknown",
+      "warmup_label": "warmup",
+      "warmup_policy": "label_as_warmup"
+    }
+  ],
+  "regime_summary": {
+    "classified_observations": 8,
+    "composite_summary": {
+      "coverage_quality": "balanced",
+      "dominant_state": "direction=range|volatility=calm|compression=compressed|shock=normal",
+      "state_counts": {
+        "direction=range|volatility=calm|compression=compressed|shock=normal": 4,
+        "direction=uptrend|volatility=volatile|compression=balanced|shock=normal": 2,
+        "direction=uptrend|volatility=volatile|compression=balanced|shock=shock": 1,
+        "direction=uptrend|volatility=volatile|compression=compressed|shock=normal": 1
+      },
+      "state_prevalence": {
+        "direction=range|volatility=calm|compression=compressed|shock=normal": 0.5,
+        "direction=uptrend|volatility=volatile|compression=balanced|shock=normal": 0.25,
+        "direction=uptrend|volatility=volatile|compression=balanced|shock=shock": 0.125,
+        "direction=uptrend|volatility=volatile|compression=compressed|shock=normal": 0.125
+      },
+      "summary_name": "composite",
+      "transition_summary": {
+        "most_common_transition": "direction=range|volatility=calm|compression=compressed|shock=normal->direction=uptrend|volatility=volatile|compression=balanced|shock=shock",
+        "transition_count": 4
+      }
+    },
+    "dimensions": [
+      {
+        "coverage_quality": "warning",
+        "dominant_state": "range",
+        "state_counts": {
+          "downtrend": 0,
+          "range": 4,
+          "uptrend": 4
+        },
+        "state_prevalence": {
+          "downtrend": 0.0,
+          "range": 0.5,
+          "uptrend": 0.5
+        },
+        "summary_name": "direction",
+        "transition_summary": {
+          "most_common_transition": "range->uptrend",
+          "transition_count": 2
+        }
+      },
+      {
+        "coverage_quality": "warning",
+        "dominant_state": "calm",
+        "state_counts": {
+          "calm": 4,
+          "normal": 0,
+          "volatile": 4
+        },
+        "state_prevalence": {
+          "calm": 0.5,
+          "normal": 0.0,
+          "volatile": 0.5
+        },
+        "summary_name": "volatility",
+        "transition_summary": {
+          "most_common_transition": "calm->volatile",
+          "transition_count": 2
+        }
+      },
+      {
+        "coverage_quality": "warning",
+        "dominant_state": "compressed",
+        "state_counts": {
+          "balanced": 3,
+          "compressed": 5,
+          "expanded": 0
+        },
+        "state_prevalence": {
+          "balanced": 0.375,
+          "compressed": 0.625,
+          "expanded": 0.0
+        },
+        "summary_name": "compression",
+        "transition_summary": {
+          "most_common_transition": "balanced->compressed",
+          "transition_count": 2
+        }
+      },
+      {
+        "coverage_quality": "warning",
+        "dominant_state": "normal",
+        "state_counts": {
+          "normal": 7,
+          "shock": 1
+        },
+        "state_prevalence": {
+          "normal": 0.875,
+          "shock": 0.125
+        },
+        "summary_name": "shock",
+        "transition_summary": {
+          "most_common_transition": "normal->shock",
+          "transition_count": 2
+        }
+      }
+    ],
+    "missing_context_observations": 0,
+    "warmup_observations": 4
+  },
+  "regime_warning_summary": {
+    "by_type": {
+      "DominantCoverage": 1,
+      "MissingState": 3,
+      "SparseCoverage": 1
+    },
+    "total_warnings": 5
+  },
+  "stability_checks": {
+    "status": "Rejected",
+    "supported_directional_eras": 1
+  },
+  "tradability_checks": {
+    "adverse": {
+      "net_edge": 1.327998,
+      "penalty": 0.011693,
+      "status": "Supported"
+    },
+    "baseline": {
+      "net_edge": 1.332229,
+      "penalty": 0.007462,
+      "status": "Supported"
+    },
+    "gross_edge": 1.339691,
+    "observed_spread_ratio": 0.000646,
+    "stress": {
+      "net_edge": 1.322767,
+      "penalty": 0.016924,
+      "status": "Supported"
+    }
+  },
+  "volatility_tests": {
+    "full": {
+      "abs_return_autocorr": -0.103073,
+      "abs_return_ljung_box": {
+        "1": {
+          "lb_pvalue": 0.7027535923094925,
+          "lb_stat": 0.14562318120183057
+        },
+        "10": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "20": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "5": {
+          "lb_pvalue": 0.8992424634983878,
+          "lb_stat": 1.6165359096316951
+        }
+      },
+      "arch_lm": {
+        "pvalue": 0.7265284545708147,
+        "stat": 0.12232307873401127
+      },
+      "fdr": {
+        "adjusted_pvalues": {
+          "abs_lb_1": 0.9048745637824084,
+          "abs_lb_5": 0.9048745637824084,
+          "arch_lm": 0.9048745637824084,
+          "sq_lb_1": 0.9048745637824084,
+          "sq_lb_5": 0.9048745637824084
+        },
+        "alpha": 0.01,
+        "rejected_count": 0,
+        "rejections": {
+          "abs_lb_1": false,
+          "abs_lb_5": false,
+          "arch_lm": false,
+          "sq_lb_1": false,
+          "sq_lb_5": false
+        }
+      },
+      "original_rows": 12,
+      "rows_used": 12,
+      "squared_return_ljung_box": {
+        "1": {
+          "lb_pvalue": 0.6814043532613844,
+          "lb_stat": 0.168549264822455
+        },
+        "10": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "20": {
+          "lb_pvalue": null,
+          "lb_stat": null
+        },
+        "5": {
+          "lb_pvalue": 0.9048745637824084,
+          "lb_stat": 1.569821069242261
+        }
+      }
+    }
+  }
+}

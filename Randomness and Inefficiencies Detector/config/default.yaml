@@ -1,0 +1,105 @@
+dataset:
+  path: /home/lnx-ubuntu-wsl/LeonAI_DO/dev/TRADING/Datasets/Volatility 75 Index_M1_201901010502_202603122158.csv
+  format: csv
+  cache_enabled: true
+
+outputs:
+  root: reports/runs
+  keep_plots: true
+
+analysis:
+  max_regression_rows: 100000
+  enabled_test_groups:
+    - data_audit
+    - directional_mds_tests
+    - volatility_tests
+    - regime_layer
+    - tradability_filter
+    - stability_validation
+  era_scheme:
+    name: default_chronological
+    exploratory_ratio: 0.60
+    validation_ratio: 0.20
+    holdout_ratio: 0.20
+    minimum_rows_per_era: 20
+  thresholds:
+    alpha: 0.01
+    directional_autocorr: 0.20
+    sign_edge: 0.08
+    directional_lags: [1, 5, 10, 20]
+    variance_ratio_lags: [2, 5, 10]
+    variance_ratio_deviation: 0.03
+    hac_beta: 0.02
+    directional_min_rejections: 2
+    volatility_autocorr: 0.25
+    volatility_lags: [1, 5, 10, 20]
+    volatility_min_rejections: 1
+  regimes:
+    enabled: true
+    schema_version: regime-layer-v1
+    config_name: default_v75_regime_scheme
+    composite_label_enabled: true
+    minimum_support_rule:
+      min_state_count: 2
+      min_state_share: 0.10
+      dominant_state_share: 0.70
+    warning_policy:
+      max_warmup_share: 0.35
+      max_unknown_share: 0.10
+    sidecar:
+      enabled: false
+      filename: regime_observations.json
+    dimensions:
+      direction:
+        enabled: true
+        lookback_bars: 4
+        thresholds:
+          negative: -0.0008
+          positive: 0.0008
+        state_names: [downtrend, range, uptrend]
+      volatility:
+        enabled: true
+        lookback_bars: 4
+        thresholds:
+          low: 0.0004
+          high: 0.0025
+        state_names: [calm, normal, volatile]
+      compression:
+        enabled: true
+        lookback_bars: 3
+        thresholds:
+          compressed: 0.0035
+          expanded: 0.0080
+        state_names: [compressed, balanced, expanded]
+      shock:
+        enabled: true
+        lookback_bars: 1
+        thresholds:
+          absolute_return: 0.0080
+        state_names: [normal, shock]
+  friction_scenarios:
+    - name: baseline
+      spread_multiplier: 1.0
+      slippage_bps: 0.0
+      latency_bars: 1
+      turnover_limit: 1.0
+    - name: adverse
+      spread_multiplier: 1.5
+      slippage_bps: 10.0
+      latency_bars: 1
+      turnover_limit: 1.0
+    - name: stress
+      spread_multiplier: 2.0
+      slippage_bps: 20.0
+      latency_bars: 2
+      turnover_limit: 1.0
+
+reporting:
+  detail_level: standard
+
+tool:
+  version: 0.1.0
+  verdicts:
+    supported_candidate: CandidateInefficiency
+    weak_evidence: WeakEvidence
+    no_actionable: NoActionableInefficiency
