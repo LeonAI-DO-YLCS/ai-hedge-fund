@@ -145,3 +145,4 @@ See journal:
 - Do not install `MetaTrader5` into Linux Docker images.
 - MT5 broker symbols may require mapping updates in bridge config (`mt5-connection-bridge/config/symbols.yaml`).
 - Core backtester engine and Pydantic schema contracts remain unchanged.
+- Datasets are stored at: \home\lnx-ubuntu-wsl\LeonAI_DO\dev\TRADING\Datasets

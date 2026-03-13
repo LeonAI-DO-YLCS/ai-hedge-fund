@@ -53,3 +53,14 @@ Before finalizing your output, silently verify:
 - [ ] Does the data output match the existing `src/data/models.py` schemas?
 
 ---
+
+## Active Technologies
+- Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, pytest (002-validate-v75-plan)
+- File-based inputs and outputs only; read-only external CSV input, local run manifests, JSON metrics, Markdown reports, plots, and logs (002-validate-v75-plan)
+- Markdown documentation, managed in a Git repository + Existing detector documentation context, Specify/OpenSpec artifacts, local filesystem only (003-v75-strategy-planning)
+- Versioned Markdown files under `Randomness and Inefficiencies Detector/docs/planning/` and planning artifacts under `specs/003-v75-strategy-planning/` (003-v75-strategy-planning)
+- Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, rich, pytest (004-detector-regimes)
+- File-based detector-local outputs only; read-only external CSV input, detector-local manifests, JSON metrics, JSON findings, Markdown reports, optional sidecar artifact files for bar-level regime observations (004-detector-regimes)
+
+## Recent Changes
+- 002-validate-v75-plan: Added Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, pytest
