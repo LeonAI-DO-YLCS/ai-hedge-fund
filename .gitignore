@@ -55,6 +55,14 @@ Thumbs.db
 
 # Frontend
 node_modules
+node_modules/
+coverage/
+
+# Logs
+*.log
+
+# Expanded env globs
+.env*
 
 # Outputs
 outputs/

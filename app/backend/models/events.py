@@ -19,6 +19,7 @@ class StartEvent(BaseEvent):
     type: Literal["start"] = "start"
     timestamp: Optional[str] = None
 
+
 class ProgressUpdateEvent(BaseEvent):
     """Event containing an agent's progress update"""
 
@@ -28,6 +29,11 @@ class ProgressUpdateEvent(BaseEvent):
     status: str
     timestamp: Optional[str] = None
     analysis: Optional[str] = None
+    model_name: Optional[str] = None
+    model_provider: Optional[str] = None
+    phase: Optional[str] = None
+    fallback_used: Optional[bool] = None
+
 
 class ErrorEvent(BaseEvent):
     """Event indicating an error occurred"""

@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils';
 import { CubeIcon } from '@radix-ui/react-icons';
-import { Key, Palette } from 'lucide-react';
+import { Key, Palette, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
-import { ApiKeysSettings, Models } from './';
+import { AgentsSettings, ApiKeysSettings, Models } from './';
 import { ThemeSettings } from './appearance';
 
 interface SettingsProps {
@@ -33,6 +33,12 @@ export function Settings({ className }: SettingsProps) {
       description: 'Local and cloud AI models',
     },
     {
+      id: 'agents',
+      label: 'Agents',
+      icon: SlidersHorizontal,
+      description: 'Agent prompts and runtime defaults',
+    },
+    {
       id: 'theme',
       label: 'Theme',
       icon: Palette,
@@ -44,6 +50,8 @@ export function Settings({ className }: SettingsProps) {
     switch (selectedSection) {
       case 'models':
         return <Models />;
+      case 'agents':
+        return <AgentsSettings />;
       case 'theme':
         return <ThemeSettings />;
       case 'api':

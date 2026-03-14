@@ -63,6 +63,8 @@ Before finalizing your output, silently verify:
 - File-based detector-local outputs only; read-only external CSV input, detector-local manifests, JSON metrics, JSON findings, Markdown reports, optional sidecar artifact files for bar-level regime observations (004-detector-regimes)
 - Python 3.11+ + FastAPI, Pydantic, requests, pandas, pytest, MetaTrader5 runtime worker on the Windows-native bridge, PyYAML-backed symbol configuration (008-close-mt5-gaps)
 - File-based configuration and logs (`.env`, YAML symbol mappings, JSONL operational logs), plus in-memory runtime state; no new database (008-close-mt5-gaps)
+- Python 3.11+ for backend/runtime, TypeScript 5.x with React 18 for frontend + FastAPI, Pydantic, SQLAlchemy, Alembic, httpx, LangChain, LangGraph, React, Vite, Tailwind CSS (009-llm-provider-management)
+- SQLite (`app/backend/hedge_fund.db`) for persisted settings, `.env` for backward-compatible key fallback, source-controlled JSON model catalogs, and in-memory TTL caches for discovered models (009-llm-provider-management)
 
 ## Recent Changes
 - 002-validate-v75-plan: Added Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, pytest

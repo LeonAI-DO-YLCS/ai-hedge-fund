@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional, Dict, Any, Literal
 from src.llm.models import ModelProvider
 from enum import Enum
@@ -17,6 +17,13 @@ class AgentModelConfig(BaseModel):
     agent_id: str
     model_name: Optional[str] = None
     model_provider: Optional[ModelProvider] = None
+    fallback_model_name: Optional[str] = None
+    fallback_model_provider: Optional[ModelProvider] = None
+    system_prompt_override: Optional[str] = None
+    system_prompt_append: Optional[str] = None
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(default=None, ge=1)
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
 class PortfolioPosition(BaseModel):
@@ -133,13 +140,18 @@ class MT5SymbolDiagnosticsResponse(BaseModel):
 class ProviderModelResponse(BaseModel):
     display_name: str
     model_name: str
+    provider: Optional[str] = None
+    source: Optional[str] = None
+    is_custom: bool = False
+    is_stale: bool = False
 
 
 class ProviderStatusResponse(BaseModel):
     name: str
     type: Literal["cloud", "local"]
     available: bool
-    status: Literal["ready", "degraded", "unavailable", "unknown"]
+    status: str
+    source: Optional[str] = None
     error: Optional[str] = None
     last_checked_at: str
     models: List[ProviderModelResponse]
@@ -172,11 +184,23 @@ class BaseHedgeFundRequest(BaseModel):
                 config_base_key = extract_base_agent_key(config.agent_id)
                 if config.agent_id == agent_id or config_base_key == base_agent_key:
                     return (
-                        config.model_name or self.model_name,
-                        config.model_provider or self.model_provider,
+                        config.model_name or self.model_name or "gpt-4.1",
+                        config.model_provider
+                        or self.model_provider
+                        or ModelProvider.OPENAI,
                     )
         # Fallback to global model settings
-        return self.model_name, self.model_provider
+        return self.model_name or "gpt-4.1", self.model_provider or ModelProvider.OPENAI
+
+    def get_agent_runtime_config(self, agent_id: str) -> Optional[AgentModelConfig]:
+        if not self.agent_models:
+            return None
+        base_agent_key = extract_base_agent_key(agent_id)
+        for config in self.agent_models:
+            config_base_key = extract_base_agent_key(config.agent_id)
+            if config.agent_id == agent_id or config_base_key == base_agent_key:
+                return config
+        return None
 
 
 class BacktestRequest(BaseHedgeFundRequest):
@@ -227,6 +251,8 @@ class HedgeFundRequest(BaseHedgeFundRequest):
         """Calculate start date if not provided"""
         if self.start_date:
             return self.start_date
+        if not self.end_date:
+            raise ValueError("end_date is required to calculate a default start_date")
         return (
             datetime.strptime(self.end_date, "%Y-%m-%d") - timedelta(days=90)
         ).strftime("%Y-%m-%d")
@@ -268,8 +294,7 @@ class FlowResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FlowSummaryResponse(BaseModel):
@@ -283,8 +308,7 @@ class FlowSummaryResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Flow Run schemas
@@ -317,8 +341,7 @@ class FlowRunResponse(BaseModel):
     results: Optional[Dict[str, Any]]
     error_message: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FlowRunSummaryResponse(BaseModel):
@@ -333,8 +356,7 @@ class FlowRunSummaryResponse(BaseModel):
     completed_at: Optional[datetime]
     error_message: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # API Key schemas
@@ -345,6 +367,10 @@ class ApiKeyCreateRequest(BaseModel):
     key_value: str = Field(..., min_length=1)
     description: Optional[str] = None
     is_active: bool = True
+    validation_status: Optional[str] = None
+    validation_error: Optional[str] = None
+    last_validated_at: Optional[datetime] = None
+    last_validation_latency_ms: Optional[int] = None
 
 
 class ApiKeyUpdateRequest(BaseModel):
@@ -353,6 +379,26 @@ class ApiKeyUpdateRequest(BaseModel):
     key_value: Optional[str] = Field(None, min_length=1)
     description: Optional[str] = None
     is_active: Optional[bool] = None
+    validation_status: Optional[str] = None
+    validation_error: Optional[str] = None
+    last_validated_at: Optional[datetime] = None
+    last_validation_latency_ms: Optional[int] = None
+
+
+class ApiKeyValidateRequest(BaseModel):
+    provider: str = Field(..., min_length=1, max_length=100)
+    key_value: str = Field(..., min_length=1)
+
+
+class ApiKeyValidateResponse(BaseModel):
+    provider: str
+    display_name: str
+    valid: bool
+    status: str
+    checked_at: str
+    latency_ms: Optional[int] = None
+    error: Optional[str] = None
+    discovered_models: Optional[List[str]] = None
 
 
 class ApiKeyResponse(BaseModel):
@@ -363,31 +409,119 @@ class ApiKeyResponse(BaseModel):
     key_value: str
     is_active: bool
     description: Optional[str]
+    display_name: Optional[str] = None
+    source: Optional[str] = None
+    status: Optional[str] = None
+    validation_error: Optional[str] = None
+    last_validated_at: Optional[datetime] = None
+    last_validation_latency_ms: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime]
     last_used: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ApiKeySummaryResponse(BaseModel):
     """API key response without the actual key value"""
 
-    id: int
+    id: Optional[int] = None
     provider: str
+    display_name: Optional[str] = None
+    source: Optional[str] = None
+    status: str = "unconfigured"
     is_active: bool
     description: Optional[str]
-    created_at: datetime
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime]
     last_used: Optional[datetime]
-    has_key: bool = True  # Indicates if a key is set
+    has_key: bool = True
+    has_stored_key: bool = True
+    last_validated_at: Optional[datetime] = None
+    validation_error: Optional[str] = None
+    last_validation_latency_ms: Optional[int] = None
+    supports_model_discovery: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ApiKeyBulkUpdateRequest(BaseModel):
     """Request to update multiple API keys at once"""
 
     api_keys: List[ApiKeyCreateRequest]
+
+
+class CustomModelRequest(BaseModel):
+    provider: str = Field(..., min_length=1, max_length=100)
+    model_name: str = Field(..., min_length=1, max_length=255)
+    display_name: Optional[str] = Field(default=None, max_length=255)
+
+
+class CustomModelResponse(BaseModel):
+    id: Optional[int] = None
+    provider: str
+    model_name: str
+    display_name: str
+    validation_status: str = "valid"
+    last_validated_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ModelDiscoveryRequest(BaseModel):
+    provider: str = Field(..., min_length=1, max_length=100)
+    force_refresh: bool = False
+
+
+class ModelDiscoveryResponse(BaseModel):
+    provider: str
+    cache_state: str
+    discovered_at: str
+    expires_at: str
+    models: List[ProviderModelResponse]
+
+
+class AgentConfigurationUpdateRequest(BaseModel):
+    model_name: Optional[str] = None
+    model_provider: Optional[ModelProvider] = None
+    fallback_model_name: Optional[str] = None
+    fallback_model_provider: Optional[ModelProvider] = None
+    system_prompt_override: Optional[str] = None
+    system_prompt_append: Optional[str] = None
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    max_tokens: Optional[int] = Field(default=None, ge=1)
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    is_active: Optional[bool] = None
+
+
+class AgentConfigurationResponse(BaseModel):
+    agent_key: str
+    display_name: str
+    description: Optional[str] = None
+    model_name: Optional[str] = None
+    model_provider: Optional[ModelProvider] = None
+    fallback_model_name: Optional[str] = None
+    fallback_model_provider: Optional[ModelProvider] = None
+    system_prompt_override: Optional[str] = None
+    system_prompt_append: Optional[str] = None
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+    warnings: List[str] = Field(default_factory=list)
+    updated_at: Optional[datetime] = None
+
+
+class AgentConfigurationListResponse(BaseModel):
+    agents: List[AgentConfigurationResponse]
+
+
+class AgentDefaultPromptResponse(BaseModel):
+    agent_key: str
+    default_prompt: str
+
+
+class AgentApplyToAllRequest(BaseModel):
+    fields: AgentConfigurationUpdateRequest
+    exclude_agents: List[str] = Field(default_factory=list)

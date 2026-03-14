@@ -1,4 +1,5 @@
 export { ApiKeysSettings } from './api-keys';
+export { AgentsSettings } from './agents';
 export { ThemeSettings } from './appearance';
 export { Models } from './models';
 export { CloudModels } from './models/cloud';

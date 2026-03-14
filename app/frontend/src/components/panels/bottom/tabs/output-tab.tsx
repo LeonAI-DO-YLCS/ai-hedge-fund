@@ -1,7 +1,6 @@
 import { useFlowContext } from '@/contexts/flow-context';
 import { useNodeContext } from '@/contexts/node-context';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
 import { BacktestOutput } from './backtest-output';
 import { sortAgents } from './output-tab-utils';
 import { RegularOutput } from './regular-output';
@@ -13,20 +12,10 @@ interface OutputTabProps {
 export function OutputTab({ className }: OutputTabProps) {
   const { currentFlowId } = useFlowContext();
   const { getAgentNodeDataForFlow, getOutputNodeDataForFlow } = useNodeContext();
-  const [updateTrigger, setUpdateTrigger] = useState(0);
   
   // Get current flow data
   const agentData = getAgentNodeDataForFlow(currentFlowId?.toString() || null);
   const outputData = getOutputNodeDataForFlow(currentFlowId?.toString() || null);
-  
-  // Force re-render periodically to show real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setUpdateTrigger(prev => prev + 1);
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
   
   // Detect if this is a backtest run
   const isBacktestRun = agentData && agentData['backtest'];
