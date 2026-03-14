@@ -3,17 +3,31 @@ import { Bot } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Button } from '@/components/ui/button';
 import { CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { ModelSelector } from '@/components/ui/llm-selector';
 import { useFlowContext } from '@/contexts/flow-context';
-import { useNodeContext } from '@/contexts/node-context';
-import { getModels, LanguageModel } from '@/data/models';
+import { AgentNodeConfig, useNodeContext } from '@/contexts/node-context';
+import { extractBaseAgentKey } from '@/data/node-mappings';
+import { findModelByIdentity, getModels, LanguageModel } from '@/data/models';
 import { useNodeState } from '@/hooks/use-node-state';
 import { cn } from '@/lib/utils';
+import { agentConfigApi } from '@/services/agent-config-api';
 import { type AgentNode } from '../types';
 import { getStatusColor } from '../utils';
 import { AgentOutputDialog } from './agent-output-dialog';
 import { NodeShell } from './node-shell';
+
+const DEFAULT_AGENT_CONFIG: AgentNodeConfig = {
+  model: null,
+  fallbackModel: null,
+  systemPromptOverride: '',
+  systemPromptAppend: '',
+  temperature: null,
+  maxTokens: null,
+  topP: null,
+};
 
 export function AgentNode({
   data,
@@ -22,7 +36,7 @@ export function AgentNode({
   isConnectable,
 }: NodeProps<AgentNode>) {
   const { currentFlowId } = useFlowContext();
-  const { getAgentNodeDataForFlow, setAgentModel, getAgentModel } = useNodeContext();
+  const { getAgentNodeDataForFlow, setAgentConfig, getAgentConfig } = useNodeContext();
   
   // Get agent node data for the current flow
   const agentNodeData = getAgentNodeDataForFlow(currentFlowId?.toString() || null);
@@ -36,41 +50,96 @@ export function AgentNode({
   const status = nodeData.status;
   const isInProgress = status === 'IN_PROGRESS';
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
+  const [defaultPrompt, setDefaultPrompt] = useState('');
   
   // Use persistent state hooks
   const [availableModels, setAvailableModels] = useNodeState<LanguageModel[]>(id, 'availableModels', []);
-  const [selectedModel, setSelectedModel] = useNodeState<LanguageModel | null>(id, 'selectedModel', null);
+  const [agentConfig, setAgentConfigState] = useNodeState<AgentNodeConfig>(id, 'agentConfig', DEFAULT_AGENT_CONFIG);
+  const baseAgentKey = extractBaseAgentKey(id);
 
   // Load models on mount
   useEffect(() => {
+    const syncConfig = async (models: LanguageModel[]) => {
+      try {
+        const persistedConfig = await agentConfigApi.getOne(baseAgentKey);
+        setAgentConfigState({
+          model: findModelByIdentity(models, persistedConfig.model_name, persistedConfig.model_provider as string | null),
+          fallbackModel: findModelByIdentity(models, persistedConfig.fallback_model_name, persistedConfig.fallback_model_provider as string | null),
+          systemPromptOverride: persistedConfig.system_prompt_override || '',
+          systemPromptAppend: persistedConfig.system_prompt_append || '',
+          temperature: persistedConfig.temperature ?? null,
+          maxTokens: persistedConfig.max_tokens ?? null,
+          topP: persistedConfig.top_p ?? null,
+        });
+      } catch (error) {
+        console.warn(`Failed to sync config for ${baseAgentKey}:`, error);
+      }
+    };
+
     const loadModels = async () => {
       try {
         const models = await getModels();
         setAvailableModels(models);
+        await syncConfig(models);
       } catch (error) {
         console.error('Failed to load models:', error);
         // Keep empty array as fallback
       }
     };
-    
-    loadModels();
-  }, [setAvailableModels]);
 
-  // Update the node context when the model changes
+    const handleConfigUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ agentKey?: string }>).detail;
+      if (!detail?.agentKey || detail.agentKey === 'all' || detail.agentKey === baseAgentKey) {
+        void loadModels();
+      }
+    };
+
+    void loadModels();
+    window.addEventListener('agent-config-updated', handleConfigUpdated as EventListener);
+    return () => window.removeEventListener('agent-config-updated', handleConfigUpdated as EventListener);
+  }, [baseAgentKey, setAvailableModels, setAgentConfigState]);
+
+  // Update the node context when config changes
   useEffect(() => {
     const flowId = currentFlowId?.toString() || null;
-    const currentContextModel = getAgentModel(flowId, id);
-    if (selectedModel !== currentContextModel) {
-      setAgentModel(flowId, id, selectedModel);
+    const currentContextConfig = getAgentConfig(flowId, id);
+    if (JSON.stringify(agentConfig) !== JSON.stringify(currentContextConfig)) {
+      setAgentConfig(flowId, id, agentConfig);
     }
-  }, [selectedModel, id, currentFlowId, setAgentModel, getAgentModel]);
+  }, [agentConfig, id, currentFlowId, setAgentConfig, getAgentConfig]);
 
   const handleModelChange = (model: LanguageModel | null) => {
-    setSelectedModel(model);
+    setAgentConfigState((prev) => ({ ...prev, model }));
   };
 
-  const handleUseGlobalModel = () => {
-    setSelectedModel(null);
+  const handleFallbackChange = (model: LanguageModel | null) => {
+    setAgentConfigState((prev) => ({ ...prev, fallbackModel: model }));
+  };
+
+  const handleNumberChange = (key: 'temperature' | 'maxTokens' | 'topP', value: string) => {
+    const parsed = value.trim() === '' ? null : Number(value);
+    setAgentConfigState((prev) => ({
+      ...prev,
+      [key]: Number.isNaN(parsed) ? null : parsed,
+    }));
+  };
+
+  const handleUseDefaults = () => {
+    setAgentConfigState(DEFAULT_AGENT_CONFIG);
+  };
+
+  const handleViewDefaultPrompt = async () => {
+    try {
+      const prompt = await agentConfigApi.getDefaultPrompt(baseAgentKey);
+      setDefaultPrompt(prompt);
+      setShowDefaultPrompt((prev) => !prev || !prompt ? false : true);
+      if (!showDefaultPrompt) {
+        setShowDefaultPrompt(true);
+      }
+    } catch (error) {
+      console.error(`Failed to load default prompt for ${baseAgentKey}:`, error);
+    }
   };
 
   return (
@@ -116,17 +185,71 @@ export function AgentNode({
                     </div>
                     <ModelSelector
                       models={availableModels}
-                      value={selectedModel?.model_name || ""}
+                      value={agentConfig.model?.model_name || ""}
                       onChange={handleModelChange}
                       placeholder="Auto"
                     />
-                    {selectedModel && (
-                      <button
-                        onClick={handleUseGlobalModel}
-                        className="text-subtitle text-primary hover:text-foreground transition-colors text-left"
-                      >
+                    <div className="text-subtitle text-primary flex items-center gap-1 mt-2">
+                      Fallback Model
+                    </div>
+                    <ModelSelector
+                      models={availableModels}
+                      value={agentConfig.fallbackModel?.model_name || ""}
+                      onChange={handleFallbackChange}
+                      placeholder="Optional fallback"
+                    />
+                    {agentConfig.model?.provider && agentConfig.fallbackModel?.provider && agentConfig.model.provider === agentConfig.fallbackModel.provider && (
+                      <p className="text-xs text-amber-400">Fallback uses the same provider as the primary model.</p>
+                    )}
+                    <div className="grid grid-cols-1 gap-2 mt-2">
+                      <Input
+                        placeholder="Temperature"
+                        value={agentConfig.temperature ?? ''}
+                        onChange={(event) => handleNumberChange('temperature', event.target.value)}
+                      />
+                      <Input
+                        placeholder="Max tokens"
+                        value={agentConfig.maxTokens ?? ''}
+                        onChange={(event) => handleNumberChange('maxTokens', event.target.value)}
+                      />
+                      <Input
+                        placeholder="Top P"
+                        value={agentConfig.topP ?? ''}
+                        onChange={(event) => handleNumberChange('topP', event.target.value)}
+                      />
+                    </div>
+                    <div className="text-subtitle text-primary flex items-center gap-1 mt-2">
+                      Prompt Override
+                    </div>
+                    <textarea
+                      className="min-h-24 rounded-md border border-border bg-node px-3 py-2 text-sm text-primary"
+                      placeholder="Replace the default system prompt for this node"
+                      value={agentConfig.systemPromptOverride}
+                      onChange={(event) => setAgentConfigState((prev) => ({ ...prev, systemPromptOverride: event.target.value }))}
+                    />
+                    <div className="text-subtitle text-primary flex items-center gap-1 mt-2">
+                      Prompt Append
+                    </div>
+                    <textarea
+                      className="min-h-20 rounded-md border border-border bg-node px-3 py-2 text-sm text-primary"
+                      placeholder="Append extra instructions to the default system prompt"
+                      value={agentConfig.systemPromptAppend}
+                      onChange={(event) => setAgentConfigState((prev) => ({ ...prev, systemPromptAppend: event.target.value }))}
+                    />
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={() => void handleViewDefaultPrompt()}>
+                        View Default
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={handleUseDefaults}>
                         Reset to Auto
-                      </button>
+                      </Button>
+                    </div>
+                    {showDefaultPrompt && defaultPrompt && (
+                      <textarea
+                        readOnly
+                        className="mt-2 min-h-28 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground"
+                        value={defaultPrompt}
+                      />
                     )}
                   </div>
                 </AccordionContent>

@@ -114,14 +114,26 @@ export function ModelSelector({
                       setOpen(false);
                     }}
                   >
-                    <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center justify-between w-full gap-3">
                       <div className="flex flex-col items-start min-w-0 flex-1">
                         <span className="text-title">{model.display_name}</span>
                         <span className="text-xs text-muted-foreground font-mono">{model.model_name}</span>
                       </div>
-                      <Badge className="text-xs text-primary bg-primary/10 border-primary/30 hover:bg-primary/20 hover:border-primary/50">
-                        {model.provider}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {model.is_custom && (
+                          <Badge className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
+                            Custom
+                          </Badge>
+                        )}
+                        {model.is_stale && (
+                          <Badge className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
+                            Stale
+                          </Badge>
+                        )}
+                        <Badge className="text-xs text-primary bg-primary/10 border-primary/30 hover:bg-primary/20 hover:border-primary/50">
+                          {model.provider}
+                        </Badge>
+                      </div>
                     </div>
                   </CommandItem>
                 ))}

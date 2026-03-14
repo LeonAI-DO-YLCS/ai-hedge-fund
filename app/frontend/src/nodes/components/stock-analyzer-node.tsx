@@ -56,7 +56,7 @@ export function StockAnalyzerNode({
   
   const { currentFlowId } = useFlowContext();
   const nodeContext = useNodeContext();
-  const { getAllAgentModels } = nodeContext;
+  const { getAllAgentConfigs } = nodeContext;
   const { getNodes, getEdges } = useReactFlow();
   const { expandBottomPanel, setBottomPanelTab } = useLayoutContext();
   
@@ -176,14 +176,21 @@ export function StockAnalyzerNode({
 
     // Collect agent models from all agent nodes
     const agentModels = [];
-    const allAgentModels = getAllAgentModels(flowId);
+    const allAgentConfigs = getAllAgentConfigs(flowId);
     for (const node of agentNodes) {
-      const model = allAgentModels[node.id];
-      if (model) {
+      const config = allAgentConfigs[node.id];
+      if (config) {
           agentModels.push({
           agent_id: node.id,
-          model_name: model.model_name,
-          model_provider: model.provider as ModelProvider
+          model_name: config.model?.model_name,
+          model_provider: config.model?.provider as ModelProvider,
+          fallback_model_name: config.fallbackModel?.model_name,
+          fallback_model_provider: config.fallbackModel?.provider as ModelProvider,
+          system_prompt_override: config.systemPromptOverride || undefined,
+          system_prompt_append: config.systemPromptAppend || undefined,
+          temperature: config.temperature ?? undefined,
+          max_tokens: config.maxTokens ?? undefined,
+          top_p: config.topP ?? undefined,
         });
       }
     }
