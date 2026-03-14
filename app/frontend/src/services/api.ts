@@ -40,21 +40,42 @@ export interface MT5SymbolsResponse {
 }
 
 export interface LanguageModelProviderResponse {
-  name: string;
-  type?: 'cloud' | 'local';
-  available?: boolean;
-  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | 'valid' | 'unverified' | 'unconfigured' | string;
+  id?: number;
+  provider: string;
+  provider_key?: string;
+  display_name?: string;
+  provider_kind?: string | null;
+  connection_mode?: string | null;
   source?: 'database' | 'environment' | 'local' | 'none' | string;
+  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | 'valid' | 'unverified' | 'unconfigured' | 'inactive' | 'disabled' | 'retired' | string;
+  group?: 'activated' | 'inactive' | 'disabled' | 'unconfigured' | 'retired' | string;
+  available?: boolean;
   error?: string | null;
   last_checked_at?: string;
-  models: Array<{
-    display_name: string;
-    model_name: string;
-    provider?: string;
-    source?: string;
-    is_custom?: boolean;
-    is_stale?: boolean;
-  }>;
+  enabled_model_count?: number;
+  inventory_count?: number;
+  collapsed_by_default?: boolean;
+}
+
+export interface ProviderInventoryEntryResponse {
+  display_name: string;
+  model_name: string;
+  provider?: string;
+  provider_key?: string;
+  source?: string;
+  is_enabled?: boolean;
+  availability_status?: string | null;
+  status_reason?: string | null;
+  last_seen_at?: string | null;
+  is_custom?: boolean;
+  is_stale?: boolean;
+}
+
+export interface ProviderInventoryResponse {
+  provider_key: string;
+  display_name: string;
+  search_enabled: boolean;
+  inventory: ProviderInventoryEntryResponse[];
 }
 
 export const api = {
@@ -111,13 +132,30 @@ export const api = {
     }
   },
 
-  discoverModels: async (provider: string, forceRefresh = false) => {
+  getProviderInventory: async (providerKey: string): Promise<ProviderInventoryResponse> => {
+    const response = await fetch(`${API_BASE_URL}/language-models/providers/${encodeURIComponent(providerKey)}/models`);
+    if (!response.ok) {
+      throw new Error(`Failed to load provider inventory: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  refreshProviderInventory: async (providerKey: string) => {
+    const response = await fetch(`${API_BASE_URL}/language-models/providers/${encodeURIComponent(providerKey)}/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to refresh provider inventory: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  discoverModels: async (providerKey: string, forceRefresh = false) => {
     const response = await fetch(`${API_BASE_URL}/language-models/discover`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ provider, force_refresh: forceRefresh }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_key: providerKey, force_refresh: forceRefresh }),
     });
     if (!response.ok) {
       throw new Error(`Failed to discover models: ${response.statusText}`);
@@ -125,13 +163,23 @@ export const api = {
     return response.json();
   },
 
-  validateCustomModel: async (provider: string, modelName: string, displayName?: string) => {
+  updateEnabledModels: async (providerKey: string, enabledModels: string[]) => {
+    const response = await fetch(`${API_BASE_URL}/language-models/providers/${encodeURIComponent(providerKey)}/models`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled_models: enabledModels }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update enabled models: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  validateCustomModel: async (providerKey: string, modelName: string, displayName?: string) => {
     const response = await fetch(`${API_BASE_URL}/language-models/custom-models/validate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ provider, model_name: modelName, display_name: displayName }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_key: providerKey, model_name: modelName, display_name: displayName }),
     });
     if (!response.ok) {
       throw new Error(`Failed to validate custom model: ${response.statusText}`);
@@ -139,16 +187,24 @@ export const api = {
     return response.json();
   },
 
-  createCustomModel: async (provider: string, modelName: string, displayName?: string) => {
+  createCustomModel: async (providerKey: string, modelName: string, displayName?: string) => {
     const response = await fetch(`${API_BASE_URL}/language-models/custom-models`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ provider, model_name: modelName, display_name: displayName }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider_key: providerKey, model_name: modelName, display_name: displayName }),
     });
     if (!response.ok) {
       throw new Error(`Failed to save custom model: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  deleteCustomModel: async (providerKey: string, modelName: string) => {
+    const response = await fetch(`${API_BASE_URL}/language-models/custom-models/${encodeURIComponent(providerKey)}/${encodeURIComponent(modelName)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete custom model: ${response.statusText}`);
     }
     return response.json();
   },

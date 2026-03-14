@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from src.utils.agent_config import extract_base_agent_key, get_agent_runtime_config
+from src.utils.agent_config import (
+    extract_base_agent_key,
+    get_agent_runtime_config,
+    resolve_prompt_baseline,
+)
 
 
 AGENT_DEFAULT_PROMPTS: dict[str, str] = {
@@ -260,13 +264,11 @@ def resolve_system_prompt(
         get_agent_runtime_config(state, resolved_agent_id) if state else None
     )
 
-    if runtime_config and runtime_config.system_prompt_override:
-        return runtime_config.system_prompt_override.strip()
-    if runtime_config and runtime_config.system_prompt_append:
-        append_text = runtime_config.system_prompt_append.strip()
-        if append_text:
-            return f"{default_prompt}\n\n{append_text}".strip()
-    return default_prompt
+    return resolve_prompt_baseline(
+        default_prompt,
+        getattr(runtime_config, "system_prompt_override", None),
+        getattr(runtime_config, "system_prompt_append", None),
+    ).text
 
 
 def build_news_sentiment_prompt(

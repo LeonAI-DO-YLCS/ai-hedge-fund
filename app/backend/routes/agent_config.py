@@ -1,42 +1,70 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.backend.database import get_db
 from app.backend.models.schemas import (
     AgentApplyToAllRequest,
+    AgentConfigurationDetailResponse,
+    AgentConfigurationEffectiveUpdateRequest,
     AgentConfigurationListResponse,
-    AgentConfigurationResponse,
+    AgentConfigurationSummaryResponse,
     AgentConfigurationUpdateRequest,
     AgentDefaultPromptResponse,
     ErrorResponse,
 )
 from app.backend.repositories.agent_config_repository import AgentConfigRepository
 from src.agents.prompts import get_default_prompt
+from src.utils.agent_config import (
+    build_effective_agent_settings,
+    derive_persisted_agent_config,
+)
 from src.utils.analysts import get_configurable_agents_list
 
 router = APIRouter(prefix="/agent-config", tags=["agent-config"])
 
 
-def _build_response(agent_meta: dict, record) -> AgentConfigurationResponse:
-    warnings: list[str] = []
-    if record and record.fallback_model_provider and record.model_provider:
-        if str(record.fallback_model_provider) == str(record.model_provider):
-            warnings.append("Fallback uses the same provider as the primary model.")
-    return AgentConfigurationResponse(
+def _get_agent(agent_key: str) -> dict | None:
+    return next(
+        (item for item in get_configurable_agents_list() if item["key"] == agent_key),
+        None,
+    )
+
+
+def _build_summary_response(
+    agent_meta: dict, record
+) -> AgentConfigurationSummaryResponse:
+    resolved = build_effective_agent_settings(
+        get_default_prompt(agent_meta["key"]), record
+    )
+    return AgentConfigurationSummaryResponse(
         agent_key=agent_meta["key"],
         display_name=agent_meta["display_name"],
         description=agent_meta.get("description"),
-        model_name=getattr(record, "model_name", None),
-        model_provider=getattr(record, "model_provider", None),
-        fallback_model_name=getattr(record, "fallback_model_name", None),
-        fallback_model_provider=getattr(record, "fallback_model_provider", None),
-        system_prompt_override=getattr(record, "system_prompt_override", None),
-        system_prompt_append=getattr(record, "system_prompt_append", None),
-        temperature=getattr(record, "temperature", None),
-        max_tokens=getattr(record, "max_tokens", None),
-        top_p=getattr(record, "top_p", None),
+        updated_at=getattr(record, "updated_at", None),
+        has_customizations=resolved["has_customizations"],
+        warnings=resolved["warnings"],
+    )
+
+
+def _build_detail_response(
+    agent_meta: dict,
+    record,
+    extra_warnings: list[str] | None = None,
+) -> AgentConfigurationDetailResponse:
+    resolved = build_effective_agent_settings(
+        get_default_prompt(agent_meta["key"]), record
+    )
+    warnings = [*resolved["warnings"], *(extra_warnings or [])]
+    return AgentConfigurationDetailResponse(
+        agent_key=agent_meta["key"],
+        display_name=agent_meta["display_name"],
+        description=agent_meta.get("description"),
+        persisted=resolved["persisted"],
+        defaults=resolved["defaults"],
+        effective=resolved["effective"],
+        sources=resolved["sources"],
         warnings=warnings,
         updated_at=getattr(record, "updated_at", None),
     )
@@ -51,7 +79,7 @@ async def get_agent_configs(db: Session = Depends(get_db)):
     repo = AgentConfigRepository(db)
     records = {record.agent_key: record for record in repo.get_all_configs()}
     agents = [
-        _build_response(agent, records.get(agent["key"]))
+        _build_summary_response(agent, records.get(agent["key"]))
         for agent in get_configurable_agents_list()
     ]
     return AgentConfigurationListResponse(agents=agents)
@@ -59,45 +87,47 @@ async def get_agent_configs(db: Session = Depends(get_db)):
 
 @router.get(
     "/{agent_key}",
-    response_model=AgentConfigurationResponse,
+    response_model=AgentConfigurationDetailResponse,
     responses={404: {"model": ErrorResponse, "description": "Agent not found"}},
 )
 async def get_agent_config(agent_key: str, db: Session = Depends(get_db)):
-    agent = next(
-        (item for item in get_configurable_agents_list() if item["key"] == agent_key),
-        None,
-    )
+    agent = _get_agent(agent_key)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found")
     repo = AgentConfigRepository(db)
-    return _build_response(agent, repo.get_config(agent_key))
+    return _build_detail_response(agent, repo.get_config(agent_key))
 
 
 @router.put(
     "/{agent_key}",
-    response_model=AgentConfigurationResponse,
+    response_model=AgentConfigurationDetailResponse,
     responses={404: {"model": ErrorResponse, "description": "Agent not found"}},
 )
 async def update_agent_config(
     agent_key: str,
-    request: AgentConfigurationUpdateRequest,
+    request: AgentConfigurationEffectiveUpdateRequest | AgentConfigurationUpdateRequest,
     db: Session = Depends(get_db),
 ):
-    agent = next(
-        (item for item in get_configurable_agents_list() if item["key"] == agent_key),
-        None,
-    )
+    agent = _get_agent(agent_key)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found")
 
     repo = AgentConfigRepository(db)
-    payload = request.model_dump(exclude_unset=True)
+    extra_warnings: list[str] = []
+    if isinstance(request, AgentConfigurationEffectiveUpdateRequest):
+        payload, extra_warnings = derive_persisted_agent_config(
+            get_default_prompt(agent_key),
+            request.effective.model_dump(),
+        )
+    else:
+        payload = request.model_dump(exclude_unset=True)
     record = repo.upsert_config(agent_key, **payload)
-    return _build_response(agent, record)
+    return _build_detail_response(agent, record, extra_warnings)
 
 
 @router.delete(
     "/{agent_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
     responses={
         204: {"description": "Agent config reset"},
         404: {"model": ErrorResponse},
@@ -108,7 +138,7 @@ async def reset_agent_config(agent_key: str, db: Session = Depends(get_db)):
     success = repo.reset_config(agent_key)
     if not success:
         raise HTTPException(status_code=404, detail="Agent config not found")
-    return {"message": "Agent config reset"}
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

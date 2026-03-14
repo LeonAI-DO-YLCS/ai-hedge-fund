@@ -6,7 +6,6 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_xai import ChatXAI
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_gigachat import GigaChat
 from langchain_ollama import ChatOllama
 from enum import Enum
 from pydantic import BaseModel
@@ -28,7 +27,6 @@ class ModelProvider(str, Enum):
     OLLAMA = "Ollama"
     LMSTUDIO = "LMStudio"
     OPENROUTER = "OpenRouter"
-    GIGACHAT = "GigaChat"
     AZURE_OPENAI = "Azure OpenAI"
     XAI = "xAI"
 
@@ -82,7 +80,10 @@ def load_models_from_json(json_path: str) -> List[LLMModel]:
     models = []
     for model_data in models_data:
         # Convert string provider to ModelProvider enum
-        provider_enum = ModelProvider(model_data["provider"])
+        try:
+            provider_enum = ModelProvider(model_data["provider"])
+        except ValueError:
+            continue
         models.append(
             LLMModel(
                 display_name=model_data["display_name"],
@@ -118,6 +119,18 @@ LLM_ORDER = [model.to_choice_tuple() for model in AVAILABLE_MODELS]
 # Create Ollama LLM_ORDER separately
 OLLAMA_LLM_ORDER = [model.to_choice_tuple() for model in OLLAMA_MODELS]
 
+PROVIDER_ENV_KEYS = {
+    ModelProvider.GROQ: "GROQ_API_KEY",
+    ModelProvider.OPENAI: "OPENAI_API_KEY",
+    ModelProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
+    ModelProvider.DEEPSEEK: "DEEPSEEK_API_KEY",
+    ModelProvider.GOOGLE: "GOOGLE_API_KEY",
+    ModelProvider.LMSTUDIO: "LMSTUDIO_API_KEY",
+    ModelProvider.OPENROUTER: "OPENROUTER_API_KEY",
+    ModelProvider.XAI: "XAI_API_KEY",
+    ModelProvider.AZURE_OPENAI: "AZURE_OPENAI_API_KEY",
+}
+
 
 def get_model_info(
     model_name: str, model_provider: ModelProvider | str
@@ -140,7 +153,15 @@ def get_model_info(
             for model in all_models
             if model.model_name == model_name and model.provider == normalized_provider
         ),
-        None,
+        LLMModel(
+            display_name=model_name,
+            model_name=model_name,
+            provider=normalized_provider
+            if isinstance(normalized_provider, ModelProvider)
+            else ModelProvider.OPENAI,
+        )
+        if isinstance(normalized_provider, ModelProvider)
+        else None,
     )
 
 
@@ -152,14 +173,7 @@ def find_model_by_name(model_name: str) -> LLMModel | None:
 
 def get_models_list():
     """Get the list of models for API responses."""
-    return [
-        {
-            "display_name": model.display_name,
-            "model_name": model.model_name,
-            "provider": model.provider.value,
-        }
-        for model in AVAILABLE_MODELS
-    ]
+    return []
 
 
 def get_model(
@@ -169,12 +183,17 @@ def get_model(
     temperature: float | None = None,
     max_tokens: int | None = None,
     top_p: float | None = None,
+    provider_key: str | None = None,
 ) -> Any:
+    resolved_provider: ModelProvider | None
+    generic_provider_key = provider_key or (
+        model_provider if isinstance(model_provider, str) else None
+    )
     if isinstance(model_provider, str):
         try:
-            model_provider = ModelProvider(model_provider)
+            resolved_provider = ModelProvider(model_provider)
         except ValueError:
-            model_provider = next(
+            resolved_provider = next(
                 (
                     provider
                     for provider in ModelProvider
@@ -182,8 +201,20 @@ def get_model(
                 ),
                 None,
             )
-            if model_provider is None:
+            if resolved_provider is None and generic_provider_key:
+                generic_provider = _load_runtime_provider_record(generic_provider_key)
+                if generic_provider is not None:
+                    return _build_generic_runtime_model(
+                        model_name=model_name,
+                        provider_record=generic_provider,
+                        api_keys=api_keys,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p,
+                    )
+            if resolved_provider is None:
                 raise ValueError(f"Unknown model provider: {model_provider}")
+        model_provider = resolved_provider
 
     kwargs = {}
     if temperature is not None:
@@ -193,10 +224,7 @@ def get_model(
     if top_p is not None:
         kwargs["top_p"] = top_p
 
-    from src.llm.provider_registry import get_provider_entry
-
-    entry = get_provider_entry(model_provider)
-    env_key = entry.env_key if entry else None
+    env_key = PROVIDER_ENV_KEYS.get(model_provider)
 
     if model_provider == ModelProvider.GROQ:
         api_key = (api_keys or {}).get(env_key or "") or os.getenv(env_key or "")
@@ -315,24 +343,6 @@ def get_model(
                 "xAI API key not found. Please make sure XAI_API_KEY is set in your .env file or provided via API keys."
             )
         return ChatXAI(model=model_name, api_key=api_key, **kwargs)
-    elif model_provider == ModelProvider.GIGACHAT:
-        if os.getenv("GIGACHAT_USER") or os.getenv("GIGACHAT_PASSWORD"):
-            return GigaChat(model=model_name)
-        else:
-            api_key = (
-                (api_keys or {}).get(env_key or "")
-                or os.getenv(env_key or "")
-                or os.getenv("GIGACHAT_CREDENTIALS")
-            )
-            if not api_key:
-                print(
-                    "API Key Error: Please make sure api_keys is set in your .env file or provided via API keys."
-                )
-                raise ValueError(
-                    "GigaChat API key not found. Please make sure GIGACHAT_API_KEY is set in your .env file or provided via API keys."
-                )
-
-            return GigaChat(credentials=api_key, model=model_name)
     elif model_provider == ModelProvider.AZURE_OPENAI:
         # Get and validate API key
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
@@ -372,3 +382,81 @@ def get_model(
             **kwargs,
         )
     raise ValueError(f"Unknown model provider: {model_provider}")
+
+
+def _load_runtime_provider_record(provider_key: str) -> dict[str, Any] | None:
+    try:
+        from app.backend.database import SessionLocal
+        from app.backend.repositories.api_key_repository import ApiKeyRepository
+        from src.llm.provider_registry import normalize_provider_key
+    except Exception:
+        return None
+
+    normalized_provider_key = normalize_provider_key(provider_key) or provider_key
+    db = SessionLocal()
+    try:
+        record = ApiKeyRepository(db).get_provider_record_by_key(
+            normalized_provider_key
+        )
+        if record is None:
+            return None
+        return {
+            "provider_key": str(record.provider_key),
+            "display_name": str(record.display_name),
+            "provider_kind": str(record.provider_kind),
+            "connection_mode": str(record.connection_mode or ""),
+            "endpoint_url": str(record.endpoint_url or "").rstrip("/"),
+            "request_defaults": dict(record.request_defaults or {}),
+            "extra_headers": dict(record.extra_headers or {}),
+        }
+    finally:
+        db.close()
+
+
+def _build_generic_runtime_model(
+    model_name: str,
+    provider_record: dict[str, Any],
+    api_keys: dict | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+    top_p: float | None = None,
+) -> Any:
+    provider_key = str(provider_record["provider_key"])
+    connection_mode = str(provider_record.get("connection_mode") or "openai_compatible")
+    endpoint_url = str(provider_record.get("endpoint_url") or "").rstrip("/")
+    request_defaults = dict(provider_record.get("request_defaults") or {})
+    extra_headers = dict(provider_record.get("extra_headers") or {})
+    api_key = (api_keys or {}).get(provider_key) or ""
+
+    if not endpoint_url:
+        raise ValueError(f"Generic provider {provider_key} is missing an endpoint URL.")
+    if not api_key:
+        raise ValueError(f"Generic provider {provider_key} is missing an API key.")
+
+    kwargs = dict(request_defaults)
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    if top_p is not None:
+        kwargs["top_p"] = top_p
+
+    if connection_mode == "anthropic_compatible":
+        return ChatAnthropic(
+            model=model_name,
+            api_key=api_key,
+            base_url=endpoint_url,
+            default_headers=extra_headers or None,
+            **kwargs,
+        )
+
+    if connection_mode in {"openai_compatible", "direct_http"}:
+        return ChatOpenAI(
+            model=model_name,
+            api_key=api_key,
+            base_url=endpoint_url,
+            default_headers=extra_headers or None,
+            **kwargs,
+        )
+
+    raise ValueError(f"Unsupported generic provider connection mode: {connection_mode}")

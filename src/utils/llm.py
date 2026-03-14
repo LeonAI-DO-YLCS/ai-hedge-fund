@@ -4,14 +4,16 @@ import json
 from typing import Any
 
 from pydantic import BaseModel
-from src.llm.models import get_model, get_model_info
+from app.backend.database import SessionLocal
+from app.backend.services.provider_inventory_service import ProviderInventoryService
+from src.llm.models import ModelProvider, get_model, get_model_info
 from src.utils.agent_config import get_agent_runtime_config
 from src.utils.progress import progress
 from src.graph.state import AgentState
 
 
 def call_llm(
-    prompt: any,
+    prompt: Any,
     pydantic_model: type[BaseModel],
     agent_name: str | None = None,
     state: AgentState | None = None,
@@ -39,7 +41,7 @@ def call_llm(
     else:
         # Use system defaults when no state or agent_name is provided
         model_name = "gpt-4.1"
-        model_provider = "OPENAI"
+        model_provider = ModelProvider.OPENAI.value
 
     # Extract API keys from state if available
     api_keys = None
@@ -52,20 +54,83 @@ def call_llm(
         get_agent_runtime_config(state, agent_name) if state and agent_name else None
     )
 
+    explicit_primary_selection = bool(runtime_config and runtime_config.model_name)
+    explicit_fallback_selection = bool(
+        runtime_config and runtime_config.fallback_model_name
+    )
+
+    def _stringify_provider(value: str | Any | None) -> str | None:
+        if value is None:
+            return None
+        enum_value = getattr(value, "value", None)
+        return str(enum_value) if enum_value is not None else str(value)
+
+    def resolve_runtime_selection(
+        active_model_name: str,
+        active_model_provider: str | Any,
+        active_provider_key: str | None,
+        require_enabled_inventory: bool,
+    ) -> dict[str, Any]:
+        provider_label = _stringify_provider(active_model_provider)
+        normalized_provider_key = active_provider_key or provider_label
+        selection = {
+            "model_name": active_model_name,
+            "provider": provider_label,
+            "provider_key": active_provider_key,
+            "model_status": "available",
+        }
+
+        if not require_enabled_inventory:
+            return selection
+
+        db = SessionLocal()
+        try:
+            inventory_service = ProviderInventoryService(db)
+            resolved = inventory_service.get_runtime_selection(
+                active_model_name,
+                normalized_provider_key,
+            )
+        finally:
+            db.close()
+
+        if resolved is None:
+            raise ValueError(
+                f"Model '{active_model_name}' is not enabled for provider '{normalized_provider_key or provider_label or 'unknown'}'."
+            )
+
+        model_status = str(resolved.get("selection_status") or "unavailable")
+        if model_status not in {"available", "stale"}:
+            raise ValueError(
+                f"Model '{active_model_name}' is {model_status} for provider '{resolved.get('provider_key') or resolved.get('provider')}'."
+            )
+        if not bool(resolved.get("provider_active", False)) and model_status != "stale":
+            raise ValueError(
+                f"Provider '{resolved.get('provider_key') or resolved.get('provider')}' is not active for new selections."
+            )
+
+        return {
+            "model_name": str(resolved.get("model_name") or active_model_name),
+            "provider": str(resolved.get("provider") or provider_label or ""),
+            "provider_key": resolved.get("provider_key") or active_provider_key,
+            "model_status": model_status,
+        }
+
     def build_progress_metadata(
         active_model_name: str,
         active_model_provider: str | Any,
+        active_provider_key: str | None,
         phase: str,
         fallback_used: bool,
+        model_status: str = "available",
         error: str | None = None,
     ) -> str:
         payload = {
             "model_name": active_model_name,
-            "model_provider": active_model_provider.value
-            if hasattr(active_model_provider, "value")
-            else str(active_model_provider),
+            "model_provider": _stringify_provider(active_model_provider),
+            "provider_key": active_provider_key,
             "phase": phase,
             "fallback_used": fallback_used,
+            "model_status": model_status,
         }
         if error:
             payload["error"] = error
@@ -74,19 +139,45 @@ def call_llm(
     def invoke_with_retries(
         active_model_name: str,
         active_model_provider: str | Any,
+        active_provider_key: str | None,
+        require_enabled_inventory: bool,
         fallback_used: bool = False,
     ) -> BaseModel:
+        resolved_selection = resolve_runtime_selection(
+            active_model_name,
+            active_model_provider,
+            active_provider_key,
+            require_enabled_inventory,
+        )
+        if agent_name and resolved_selection["model_status"] == "stale":
+            progress.update_status(
+                agent_name,
+                None,
+                "Using stale saved model selection",
+                build_progress_metadata(
+                    resolved_selection["model_name"],
+                    resolved_selection["provider"],
+                    resolved_selection.get("provider_key"),
+                    "warning",
+                    fallback_used,
+                    resolved_selection["model_status"],
+                ),
+            )
+
         last_error: Exception | None = None
         for attempt in range(max_retries):
             try:
-                model_info = get_model_info(active_model_name, active_model_provider)
+                model_info = get_model_info(
+                    resolved_selection["model_name"], resolved_selection["provider"]
+                )
                 llm = get_model(
-                    active_model_name,
-                    active_model_provider,
+                    resolved_selection["model_name"],
+                    resolved_selection["provider"],
                     api_keys,
                     temperature=runtime_config.temperature if runtime_config else None,
                     max_tokens=runtime_config.max_tokens if runtime_config else None,
                     top_p=runtime_config.top_p if runtime_config else None,
+                    provider_key=resolved_selection.get("provider_key"),
                 )
 
                 if not (model_info and not model_info.has_json_mode()):
@@ -107,17 +198,25 @@ def call_llm(
                         None,
                         f"Error - retry {attempt + 1}/{max_retries}",
                         build_progress_metadata(
-                            active_model_name,
-                            active_model_provider,
+                            resolved_selection["model_name"],
+                            resolved_selection["provider"],
+                            resolved_selection.get("provider_key"),
                             "fallback" if fallback_used else "retry",
                             fallback_used,
+                            resolved_selection["model_status"],
                             str(e),
                         ),
                     )
         raise last_error or RuntimeError("Unknown LLM invocation failure")
 
     try:
-        return invoke_with_retries(model_name, model_provider)
+        primary_provider_key = runtime_config.provider_key if runtime_config else None
+        return invoke_with_retries(
+            model_name,
+            model_provider,
+            primary_provider_key,
+            explicit_primary_selection,
+        )
     except Exception as primary_error:
         fallback_model_name = (
             runtime_config.fallback_model_name if runtime_config else None
@@ -126,6 +225,11 @@ def call_llm(
             runtime_config.fallback_model_provider
             if runtime_config and runtime_config.fallback_model_provider
             else model_provider
+        )
+        fallback_provider_key = (
+            runtime_config.fallback_provider_key
+            if runtime_config and runtime_config.fallback_provider_key
+            else (runtime_config.provider_key if runtime_config else None)
         )
 
         if fallback_model_name:
@@ -137,14 +241,20 @@ def call_llm(
                     build_progress_metadata(
                         fallback_model_name,
                         fallback_model_provider,
+                        fallback_provider_key,
                         "fallback",
                         True,
+                        "available",
                         str(primary_error),
                     ),
                 )
             try:
                 fallback_result = invoke_with_retries(
-                    fallback_model_name, fallback_model_provider, True
+                    fallback_model_name,
+                    fallback_model_provider,
+                    fallback_provider_key,
+                    explicit_fallback_selection,
+                    True,
                 )
                 if agent_name:
                     progress.update_status(
@@ -154,6 +264,7 @@ def call_llm(
                         build_progress_metadata(
                             fallback_model_name,
                             fallback_model_provider,
+                            fallback_provider_key,
                             "fallback",
                             True,
                         ),
@@ -171,8 +282,10 @@ def call_llm(
                         build_progress_metadata(
                             fallback_model_name,
                             fallback_model_provider,
+                            fallback_provider_key,
                             "default_response",
                             True,
+                            "unavailable",
                             str(fallback_error),
                         ),
                     )
@@ -239,16 +352,20 @@ def get_agent_model_config(state, agent_name):
         model_name, model_provider = request.get_agent_model_config(agent_name)
         # Ensure we have valid values
         if model_name and model_provider:
-            return model_name, model_provider.value if hasattr(
-                model_provider, "value"
-            ) else str(model_provider)
+            enum_value = getattr(model_provider, "value", None)
+            return model_name, str(enum_value) if enum_value is not None else str(
+                model_provider
+            )
 
     # Fall back to global configuration (system defaults)
     model_name = state.get("metadata", {}).get("model_name") or "gpt-4.1"
-    model_provider = state.get("metadata", {}).get("model_provider") or "OPENAI"
+    model_provider = (
+        state.get("metadata", {}).get("model_provider") or ModelProvider.OPENAI.value
+    )
 
     # Convert enum to string if necessary
-    if hasattr(model_provider, "value"):
-        model_provider = model_provider.value
+    enum_value = getattr(model_provider, "value", None)
+    if enum_value is not None:
+        model_provider = str(enum_value)
 
     return model_name, model_provider

@@ -2,52 +2,42 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { clearModelsCache } from '@/data/models';
-import { ApiKeyStatus, ApiKeySummary, apiKeysService } from '@/services/api-keys-api';
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Key, Loader2, Trash2, XCircle } from 'lucide-react';
+import {
+  ApiKey,
+  ApiKeySummary,
+  apiKeysService,
+  ConnectionMode,
+  GenericProviderUpsertRequest,
+} from '@/services/api-keys-api';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Key,
+  Loader2,
+  Plus,
+  Trash2,
+  XCircle,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-interface ApiKeyField {
-  key: string;
-  label: string;
-  description: string;
-  url: string;
-  placeholder: string;
-  requiresValidation?: boolean;
-}
+const CONNECTION_MODES: ConnectionMode[] = ['openai_compatible', 'anthropic_compatible', 'direct_http'];
 
-const FINANCIAL_API_KEYS: ApiKeyField[] = [
-  {
-    key: 'FINANCIAL_DATASETS_API_KEY',
-    label: 'Financial Datasets API',
-    description: 'For getting financial data to power the hedge fund',
-    url: 'https://financialdatasets.ai/',
-    placeholder: 'your-financial-datasets-api-key',
-    requiresValidation: false,
-  },
-];
-
-const LLM_API_KEYS: ApiKeyField[] = [
-  { key: 'ANTHROPIC_API_KEY', label: 'Anthropic API', description: 'For Claude models', url: 'https://anthropic.com/', placeholder: 'your-anthropic-api-key', requiresValidation: true },
-  { key: 'DEEPSEEK_API_KEY', label: 'DeepSeek API', description: 'For DeepSeek models', url: 'https://deepseek.com/', placeholder: 'your-deepseek-api-key', requiresValidation: true },
-  { key: 'GROQ_API_KEY', label: 'Groq API', description: 'For Groq-hosted models', url: 'https://groq.com/', placeholder: 'your-groq-api-key', requiresValidation: true },
-  { key: 'GOOGLE_API_KEY', label: 'Google API', description: 'For Gemini models', url: 'https://ai.dev/', placeholder: 'your-google-api-key', requiresValidation: true },
-  { key: 'OPENAI_API_KEY', label: 'OpenAI API', description: 'For OpenAI models', url: 'https://platform.openai.com/', placeholder: 'your-openai-api-key', requiresValidation: true },
-  { key: 'OPENROUTER_API_KEY', label: 'OpenRouter API', description: 'For router and aggregator models', url: 'https://openrouter.ai/', placeholder: 'your-openrouter-api-key', requiresValidation: true },
-  { key: 'XAI_API_KEY', label: 'xAI API', description: 'For Grok models', url: 'https://x.ai/', placeholder: 'your-xai-api-key', requiresValidation: true },
-  { key: 'GIGACHAT_API_KEY', label: 'GigaChat API', description: 'For GigaChat models', url: 'https://github.com/ai-forever/gigachat', placeholder: 'your-gigachat-api-key', requiresValidation: true },
-  { key: 'AZURE_OPENAI_API_KEY', label: 'Azure OpenAI API', description: 'For Azure OpenAI deployments', url: 'https://azure.microsoft.com/', placeholder: 'your-azure-openai-api-key', requiresValidation: true },
-];
-
-type StatusMap = Record<string, ApiKeyStatus | string>;
-type SummaryMap = Record<string, ApiKeySummary>;
+type DetailMap = Record<string, ApiKey>;
+type DraftMap = Record<string, string>;
+type GenericDraftMap = Record<string, GenericProviderUpsertRequest>;
 
 const STATUS_LABELS: Record<string, string> = {
   valid: 'Validated',
   invalid: 'Invalid',
   unverified: 'Unverified',
   unconfigured: 'Unconfigured',
-  unsaved: 'Unsaved changes',
-  unavailable: 'Unavailable',
+  inactive: 'Inactive',
+  disabled: 'Disabled',
+  retired: 'Retired',
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -56,7 +46,7 @@ function StatusBadge({ status }: { status: string }) {
       ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
       : status === 'invalid'
       ? 'text-red-400 border-red-500/30 bg-red-500/10'
-      : status === 'unverified' || status === 'unsaved'
+      : status === 'unverified' || status === 'inactive'
       ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
       : 'text-muted-foreground border-border bg-muted/40';
 
@@ -65,7 +55,7 @@ function StatusBadge({ status }: { status: string }) {
       ? CheckCircle2
       : status === 'invalid'
       ? XCircle
-      : status === 'unverified' || status === 'unsaved'
+      : status === 'unverified' || status === 'inactive'
       ? AlertTriangle
       : Key;
 
@@ -78,337 +68,402 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function ApiKeysSettings() {
-  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const [savedValues, setSavedValues] = useState<Record<string, string>>({});
-  const [summaries, setSummaries] = useState<SummaryMap>({});
-  const [statuses, setStatuses] = useState<StatusMap>({});
-  const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [providers, setProviders] = useState<ApiKeySummary[]>([]);
+  const [details, setDetails] = useState<DetailMap>({});
+  const [draftValues, setDraftValues] = useState<DraftMap>({});
+  const [genericValues, setGenericValues] = useState<GenericDraftMap>({});
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [busyKeys, setBusyKeys] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [genericDraft, setGenericDraft] = useState<GenericProviderUpsertRequest>({
+    display_name: '',
+    connection_mode: 'openai_compatible',
+    endpoint_url: '',
+    models_url: '',
+    key_value: '',
+    is_active: true,
+  });
 
-  const allFields = useMemo(() => [...FINANCIAL_API_KEYS, ...LLM_API_KEYS], []);
-
-  useEffect(() => {
-    void loadApiKeys();
-  }, []);
-
-  const loadApiKeys = async () => {
+  const loadProviders = async () => {
+    setLoading(true);
+    setGlobalError(null);
     try {
-      setLoading(true);
-      setGlobalError(null);
-      const apiKeySummaries = await apiKeysService.getAllApiKeys(true);
-      const summaryMap: SummaryMap = {};
-      const initialDrafts: Record<string, string> = {};
-      const initialSaved: Record<string, string> = {};
-      const initialStatuses: StatusMap = {};
-
-      for (const field of allFields) {
-        const summary = apiKeySummaries.find((item) => item.provider === field.key);
-        if (summary) {
-          summaryMap[field.key] = summary;
-          initialStatuses[field.key] = summary.status || 'unconfigured';
-          if (summary.has_stored_key) {
-            try {
-              const fullKey = await apiKeysService.getApiKey(field.key);
-              initialDrafts[field.key] = fullKey.key_value;
-              initialSaved[field.key] = fullKey.key_value;
-            } catch (error) {
-              console.warn(`Failed to load key for ${field.key}:`, error);
-              initialDrafts[field.key] = '';
-              initialSaved[field.key] = '';
-            }
-          } else {
-            initialDrafts[field.key] = '';
-            initialSaved[field.key] = '';
-          }
-        } else {
-          initialStatuses[field.key] = 'unconfigured';
-          initialDrafts[field.key] = '';
-          initialSaved[field.key] = '';
-        }
-      }
-
-      setSummaries(summaryMap);
-      setDraftValues(initialDrafts);
-      setSavedValues(initialSaved);
-      setStatuses(initialStatuses);
+      const response = await apiKeysService.getAllApiKeys(true);
+      setProviders(response);
     } catch (error) {
-      console.error('Failed to load API keys:', error);
-      setGlobalError('Failed to load API keys. Please try again.');
+      console.error('Failed to load providers:', error);
+      setGlobalError('Failed to load provider settings.');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleKeyVisibility = (key: string) => {
-    setVisibleKeys((prev) => ({ ...prev, [key]: !prev[key] }));
+  useEffect(() => {
+    void loadProviders();
+  }, []);
+
+  const groupedProviders = useMemo(() => {
+    const groups: Record<string, ApiKeySummary[]> = {
+      activated: [],
+      inactive: [],
+      disabled: [],
+      unconfigured: [],
+      retired: [],
+    };
+    providers.forEach((provider) => {
+      const group = String(provider.group || 'unconfigured');
+      groups[group] = groups[group] || [];
+      groups[group].push(provider);
+    });
+    return groups;
+  }, [providers]);
+
+  const ensureDetail = async (providerKey: string) => {
+    if (details[providerKey]) return details[providerKey];
+    const detail = await apiKeysService.getApiKey(providerKey);
+    setDetails((prev) => ({ ...prev, [providerKey]: detail }));
+    setDraftValues((prev) => ({ ...prev, [providerKey]: detail.key_value || '' }));
+    if (detail.provider_kind === 'generic') {
+      setGenericValues((prev) => ({
+        ...prev,
+        [providerKey]: {
+          provider_key: detail.provider_key || providerKey,
+          display_name: detail.display_name || providerKey,
+          provider_kind: 'generic',
+          connection_mode: detail.connection_mode || 'openai_compatible',
+          endpoint_url: detail.endpoint_url || '',
+          models_url: detail.models_url || '',
+          key_value: detail.key_value || '',
+          request_defaults: detail.request_defaults || null,
+          extra_headers: detail.extra_headers || null,
+          is_active: detail.is_active,
+        },
+      }));
+    }
+    return detail;
   };
 
-  const setBusy = (key: string, value: boolean) => {
-    setBusyKeys((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleDraftChange = (key: string, value: string) => {
-    setDraftValues((prev) => ({ ...prev, [key]: value }));
-    setErrors((prev) => ({ ...prev, [key]: null }));
-    const savedValue = savedValues[key] || '';
-    setStatuses((prev) => ({
-      ...prev,
-      [key]: value.trim() === savedValue.trim() ? (summaries[key]?.status || 'unconfigured') : 'unsaved',
-    }));
-  };
-
-  const saveFinancialKey = async (field: ApiKeyField) => {
-    const rawValue = draftValues[field.key] || '';
-    const trimmedValue = rawValue.trim();
-    setBusy(field.key, true);
-    setErrors((prev) => ({ ...prev, [field.key]: null }));
-    try {
-      if (!trimmedValue) {
-        await apiKeysService.deleteApiKey(field.key);
-        setSavedValues((prev) => ({ ...prev, [field.key]: '' }));
-        setStatuses((prev) => ({ ...prev, [field.key]: 'unconfigured' }));
-        return;
+  const toggleExpanded = async (providerKey: string) => {
+    setExpanded((prev) => ({ ...prev, [providerKey]: !prev[providerKey] }));
+    if (!expanded[providerKey]) {
+      try {
+        await ensureDetail(providerKey);
+      } catch (error) {
+        setErrors((prev) => ({ ...prev, [providerKey]: error instanceof Error ? error.message : 'Failed to load provider details.' }));
       }
+    }
+  };
 
-      await apiKeysService.createOrUpdateApiKey({
-        provider: field.key,
-        key_value: trimmedValue,
+  const saveBuiltInProvider = async (provider: ApiKeySummary) => {
+    const providerKey = provider.provider_key || provider.provider;
+    const keyValue = (draftValues[providerKey] || '').trim();
+    setBusyKeys((prev) => ({ ...prev, [providerKey]: true }));
+    setErrors((prev) => ({ ...prev, [providerKey]: null }));
+    try {
+      if (!keyValue) {
+        await apiKeysService.deleteApiKey(providerKey);
+      } else {
+        await apiKeysService.createOrUpdateApiKey({
+          provider: providerKey,
+          key_value: keyValue,
+          is_active: true,
+        });
+      }
+      clearModelsCache();
+      setDetails((prev) => ({ ...prev, [providerKey]: undefined as never }));
+      await loadProviders();
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, [providerKey]: error instanceof Error ? error.message : 'Failed to save provider.' }));
+    } finally {
+      setBusyKeys((prev) => ({ ...prev, [providerKey]: false }));
+    }
+  };
+
+  const deleteGenericProvider = async (providerKey: string) => {
+    setBusyKeys((prev) => ({ ...prev, [providerKey]: true }));
+    try {
+      await apiKeysService.deleteGenericProvider(providerKey);
+      clearModelsCache();
+      await loadProviders();
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, [providerKey]: error instanceof Error ? error.message : 'Failed to retire provider.' }));
+    } finally {
+      setBusyKeys((prev) => ({ ...prev, [providerKey]: false }));
+    }
+  };
+
+  const createGenericProvider = async () => {
+    setBusyKeys((prev) => ({ ...prev, generic: true }));
+    setGlobalError(null);
+    try {
+      await apiKeysService.createGenericProvider(genericDraft);
+      clearModelsCache();
+      setGenericDraft({
+        display_name: '',
+        connection_mode: 'openai_compatible',
+        endpoint_url: '',
+        models_url: '',
+        key_value: '',
         is_active: true,
       });
-      setSavedValues((prev) => ({ ...prev, [field.key]: trimmedValue }));
-      setStatuses((prev) => ({ ...prev, [field.key]: 'valid' }));
+      await loadProviders();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save API key.';
-      setErrors((prev) => ({ ...prev, [field.key]: message }));
-      setStatuses((prev) => ({ ...prev, [field.key]: 'invalid' }));
+      setGlobalError(error instanceof Error ? error.message : 'Failed to create provider.');
     } finally {
-      setBusy(field.key, false);
+      setBusyKeys((prev) => ({ ...prev, generic: false }));
     }
   };
 
-  const saveAndValidateKey = async (field: ApiKeyField) => {
-    const rawValue = draftValues[field.key] || '';
-    const trimmedValue = rawValue.trim();
-
-    setBusy(field.key, true);
-    setErrors((prev) => ({ ...prev, [field.key]: null }));
+  const saveGenericProvider = async (providerKey: string) => {
+    const genericValue = genericValues[providerKey];
+    if (!genericValue) {
+      return;
+    }
+    setBusyKeys((prev) => ({ ...prev, [providerKey]: true }));
+    setErrors((prev) => ({ ...prev, [providerKey]: null }));
     try {
-      if (!trimmedValue) {
-        await apiKeysService.deleteApiKey(field.key);
-        clearModelsCache();
-        setSavedValues((prev) => ({ ...prev, [field.key]: '' }));
-        setStatuses((prev) => ({ ...prev, [field.key]: 'unconfigured' }));
-        await loadApiKeys();
-        return;
-      }
-
-      const validation = await apiKeysService.validateApiKey(field.key, trimmedValue);
-      if (validation.status === 'invalid') {
-        setStatuses((prev) => ({ ...prev, [field.key]: 'invalid' }));
-        setErrors((prev) => ({ ...prev, [field.key]: validation.error || 'Provider rejected this key.' }));
-        return;
-      }
-
-      await apiKeysService.createOrUpdateApiKey({
-        provider: field.key,
-        key_value: trimmedValue,
-        is_active: true,
-        validation_status: validation.status,
-        validation_error: validation.error,
-        last_validated_at: validation.checked_at,
-        last_validation_latency_ms: validation.latency_ms,
+      await apiKeysService.updateGenericProvider(providerKey, {
+        ...genericValue,
+        key_value: (draftValues[providerKey] || '').trim() || undefined,
       });
-
       clearModelsCache();
-      setSavedValues((prev) => ({ ...prev, [field.key]: trimmedValue }));
-      setStatuses((prev) => ({ ...prev, [field.key]: validation.status }));
-      await loadApiKeys();
+      setDetails((prev) => ({ ...prev, [providerKey]: undefined as never }));
+      await loadProviders();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save API key.';
-      setErrors((prev) => ({ ...prev, [field.key]: message }));
-      setStatuses((prev) => ({ ...prev, [field.key]: 'invalid' }));
+      setErrors((prev) => ({
+        ...prev,
+        [providerKey]: error instanceof Error ? error.message : 'Failed to update provider.',
+      }));
     } finally {
-      setBusy(field.key, false);
+      setBusyKeys((prev) => ({ ...prev, [providerKey]: false }));
     }
   };
 
-  const clearKey = async (field: ApiKeyField) => {
-    setBusy(field.key, true);
-    try {
-      await apiKeysService.deleteApiKey(field.key);
-      clearModelsCache();
-      setDraftValues((prev) => ({ ...prev, [field.key]: '' }));
-      setSavedValues((prev) => ({ ...prev, [field.key]: '' }));
-      setStatuses((prev) => ({ ...prev, [field.key]: 'unconfigured' }));
-      setErrors((prev) => ({ ...prev, [field.key]: null }));
-      await loadApiKeys();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete API key.';
-      setErrors((prev) => ({ ...prev, [field.key]: message }));
-    } finally {
-      setBusy(field.key, false);
-    }
-  };
+  const renderProviderCard = (provider: ApiKeySummary) => {
+    const providerKey = provider.provider_key || provider.provider;
+    const isExpanded = !!expanded[providerKey];
+    const detail = details[providerKey];
+    const draftValue = draftValues[providerKey] ?? detail?.key_value ?? '';
+    const isGeneric = provider.provider_kind === 'generic';
+    const genericValue = genericValues[providerKey];
+    const busy = !!busyKeys[providerKey];
 
-  const renderApiKeySection = (title: string, description: string, keys: ApiKeyField[]) => (
-    <Card className="bg-panel border-gray-700 dark:border-gray-700">
-      <CardHeader>
-        <CardTitle className="text-lg font-medium text-primary flex items-center gap-2">
-          <Key className="h-4 w-4" />
-          {title}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {keys.map((field) => {
-          const status = statuses[field.key] || 'unconfigured';
-          const isBusy = !!busyKeys[field.key];
-          const summary = summaries[field.key];
-          return (
-            <div key={field.key} className="space-y-2 rounded-lg border border-border/60 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <button
-                    className="text-sm font-medium text-primary hover:text-blue-500 cursor-pointer transition-colors text-left"
-                    onClick={() => window.open(field.url, '_blank')}
-                  >
-                    {field.label}
-                  </button>
-                  <p className="text-xs text-muted-foreground">{field.description}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={status} />
-                    {summary?.source && summary.source !== 'none' && (
-                      <span className="text-[11px] text-muted-foreground">Source: {summary.source}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+    return (
+      <div key={providerKey} className="rounded-lg border border-border/60 bg-panel">
+        <button
+          className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
+          onClick={() => void toggleExpanded(providerKey)}
+        >
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-primary">{provider.display_name || providerKey}</span>
+              <StatusBadge status={String(provider.status || 'unconfigured')} />
+              {provider.source && provider.source !== 'none' ? (
+                <span className="text-[11px] text-muted-foreground">Source: {provider.source}</span>
+              ) : null}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {provider.enabled_model_count || 0} enabled / {provider.inventory_count || 0} known models
+            </div>
+            {provider.error ? <div className="text-xs text-amber-400">{provider.error}</div> : null}
+          </div>
+          {isExpanded ? <ChevronDown className="mt-0.5 h-4 w-4" /> : <ChevronRight className="mt-0.5 h-4 w-4" />}
+        </button>
 
-              <div className="relative">
+        {isExpanded ? (
+          <div className="space-y-3 border-t border-border/60 px-4 py-3">
+            {isGeneric && detail && genericValue ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Input
-                  type={visibleKeys[field.key] ? 'text' : 'password'}
-                  placeholder={field.placeholder}
-                  value={draftValues[field.key] || ''}
-                  onChange={(e) => handleDraftChange(field.key, e.target.value)}
-                  className="pr-20"
+                  value={genericValue.display_name}
+                  onChange={(event) => setGenericValues((prev) => ({
+                    ...prev,
+                    [providerKey]: { ...genericValue, display_name: event.target.value },
+                  }))}
+                  placeholder="Display name"
                 />
-                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {!!draftValues[field.key] && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:bg-red-500/10 hover:text-red-500"
-                      onClick={() => clearKey(field)}
-                      disabled={isBusy}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
+                <select
+                  className="h-10 rounded-md border border-border bg-node px-3 text-sm text-primary"
+                  value={genericValue.connection_mode}
+                  onChange={(event) => setGenericValues((prev) => ({
+                    ...prev,
+                    [providerKey]: { ...genericValue, connection_mode: event.target.value },
+                  }))}
+                >
+                  {CONNECTION_MODES.map((mode) => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
+                <Input
+                  value={genericValue.endpoint_url || ''}
+                  onChange={(event) => setGenericValues((prev) => ({
+                    ...prev,
+                    [providerKey]: { ...genericValue, endpoint_url: event.target.value },
+                  }))}
+                  placeholder="Endpoint URL"
+                />
+                <Input
+                  value={genericValue.models_url || ''}
+                  onChange={(event) => setGenericValues((prev) => ({
+                    ...prev,
+                    [providerKey]: { ...genericValue, models_url: event.target.value },
+                  }))}
+                  placeholder="Models URL"
+                />
+              </div>
+            ) : null}
+
+            <div className="relative">
+              <Input
+                type={visibleKeys[providerKey] ? 'text' : 'password'}
+                placeholder="Provider key"
+                value={draftValue}
+                onChange={(event) => setDraftValues((prev) => ({ ...prev, [providerKey]: event.target.value }))}
+                className="pr-20"
+              />
+              <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                {draftValue ? (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
-                    onClick={() => toggleKeyVisibility(field.key)}
+                    className="h-7 w-7 hover:bg-red-500/10 hover:text-red-500"
+                    onClick={() => setDraftValues((prev) => ({ ...prev, [providerKey]: '' }))}
                   >
-                    {visibleKeys[field.key] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    <Trash2 className="h-3 w-3" />
                   </Button>
-                </div>
-              </div>
-
-              {errors[field.key] && <p className="text-xs text-red-400">{errors[field.key]}</p>}
-              {status === 'unverified' && !errors[field.key] && (
-                <p className="text-xs text-amber-400">Provider could not be verified. The key is saved and will be retried later.</p>
-              )}
-
-              <div className="flex flex-wrap items-center gap-2">
+                ) : null}
                 <Button
-                  size="sm"
-                  onClick={() => (field.requiresValidation ? saveAndValidateKey(field) : saveFinancialKey(field))}
-                  disabled={isBusy}
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setVisibleKeys((prev) => ({ ...prev, [providerKey]: !prev[providerKey] }))}
                 >
-                  {isBusy ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : field.requiresValidation ? (
-                    'Save & Validate'
-                  ) : (
-                    'Save'
-                  )}
+                  {visibleKeys[providerKey] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                 </Button>
-                {summary?.last_validated_at && (
-                  <span className="text-[11px] text-muted-foreground">
-                    Last checked: {new Date(summary.last_validated_at).toLocaleString()}
-                  </span>
-                )}
               </div>
             </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-primary mb-2">API Keys</h2>
-          <p className="text-sm text-muted-foreground">Loading API keys...</p>
-        </div>
-        <Card className="bg-panel border-gray-700 dark:border-gray-700">
-          <CardContent className="p-6 text-sm text-muted-foreground">Please wait while we load your API keys...</CardContent>
-        </Card>
+            {errors[providerKey] ? <p className="text-xs text-red-400">{errors[providerKey]}</p> : null}
+
+            <div className="flex flex-wrap gap-2">
+              {!isGeneric ? (
+                <Button size="sm" onClick={() => void saveBuiltInProvider(provider)} disabled={busy}>
+                  {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save & Validate
+                </Button>
+              ) : null}
+              {isGeneric ? (
+                <Button size="sm" onClick={() => void saveGenericProvider(providerKey)} disabled={busy}>
+                  {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              ) : null}
+              {isGeneric ? (
+                <Button variant="outline" size="sm" onClick={() => void deleteGenericProvider(providerKey)} disabled={busy}>
+                  {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Retire Provider
+                </Button>
+              ) : null}
+              {provider.last_validated_at ? (
+                <span className="text-[11px] text-muted-foreground">
+                  Last checked: {new Date(provider.last_validated_at).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     );
-  }
+  };
+
+  const renderGroup = (title: string, items: ApiKeySummary[]) => {
+    if (items.length === 0) return null;
+    return (
+      <Card className="border-gray-700 bg-panel dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-medium text-primary">
+            <Key className="h-4 w-4" />
+            {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">{items.map(renderProviderCard)}</CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-primary mb-2">API Keys</h2>
+        <h2 className="mb-2 text-xl font-semibold text-primary">Providers</h2>
         <p className="text-sm text-muted-foreground">
-          Configure provider credentials with explicit Save & Validate steps. Unsaved edits stay local until you confirm them.
+          Activated providers stay at the top, unused providers stay collapsed, and generic providers join the same workflow.
         </p>
       </div>
 
-      {globalError && (
-        <Card className="bg-red-500/5 border-red-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <Key className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-              <div className="space-y-1">
-                <h4 className="text-sm font-medium text-red-500">Error</h4>
-                <p className="text-xs text-muted-foreground">{globalError}</p>
-                <Button variant="ghost" size="sm" onClick={() => void loadApiKeys()} className="text-xs mt-2 p-0 h-auto text-red-500 hover:text-red-400">
-                  Try again
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {globalError ? (
+        <div className="rounded-lg border border-red-600/30 bg-red-900/20 p-4 text-sm text-red-300">{globalError}</div>
+      ) : null}
 
-      {renderApiKeySection('Financial Data', 'API keys for accessing financial market data and datasets.', FINANCIAL_API_KEYS)}
-      {renderApiKeySection('Language Models', 'API keys for accessing large language model providers.', LLM_API_KEYS)}
-
-      <Card className="bg-amber-500/5 border-amber-500/20">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <Key className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
-            <div className="space-y-1">
-              <h4 className="text-sm font-medium text-amber-500">Security Note</h4>
-              <p className="text-xs text-muted-foreground">
-                API keys are stored locally for this workspace. Save actions are explicit, and provider model caches refresh after key changes.
-              </p>
-            </div>
+      <Card className="border-gray-700 bg-panel dark:border-gray-700">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-medium text-primary">
+            <Plus className="h-4 w-4" />
+            Add Generic Provider
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Input
+            placeholder="Display name"
+            value={genericDraft.display_name}
+            onChange={(event) => setGenericDraft((prev) => ({ ...prev, display_name: event.target.value }))}
+          />
+          <select
+            className="h-10 rounded-md border border-border bg-node px-3 text-sm text-primary"
+            value={genericDraft.connection_mode}
+            onChange={(event) => setGenericDraft((prev) => ({ ...prev, connection_mode: event.target.value }))}
+          >
+            {CONNECTION_MODES.map((mode) => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </select>
+          <Input
+            placeholder="Endpoint URL"
+            value={genericDraft.endpoint_url || ''}
+            onChange={(event) => setGenericDraft((prev) => ({ ...prev, endpoint_url: event.target.value }))}
+          />
+          <Input
+            placeholder="Models URL"
+            value={genericDraft.models_url || ''}
+            onChange={(event) => setGenericDraft((prev) => ({ ...prev, models_url: event.target.value }))}
+          />
+          <Input
+            placeholder="API key"
+            value={genericDraft.key_value || ''}
+            onChange={(event) => setGenericDraft((prev) => ({ ...prev, key_value: event.target.value }))}
+          />
+          <div className="flex items-center">
+            <Button onClick={() => void createGenericProvider()} disabled={!!busyKeys.generic}>
+              {busyKeys.generic ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create Provider
+            </Button>
           </div>
         </CardContent>
       </Card>
+
+      {loading ? (
+        <div className="rounded-lg border border-border/60 bg-panel p-6 text-sm text-muted-foreground">Loading provider settings...</div>
+      ) : (
+        <div className="space-y-6">
+          {renderGroup('Activated Providers', groupedProviders.activated)}
+          {renderGroup('Inactive Providers', groupedProviders.inactive)}
+          {renderGroup('Disabled Providers', groupedProviders.disabled)}
+          {renderGroup('Unconfigured Providers', groupedProviders.unconfigured)}
+          {renderGroup('Retired Providers', groupedProviders.retired)}
+        </div>
+      )}
     </div>
   );
 }

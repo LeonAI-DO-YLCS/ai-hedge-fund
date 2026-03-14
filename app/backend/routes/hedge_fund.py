@@ -104,8 +104,10 @@ async def run(
                     analysis=analysis,
                     model_name=metadata.get("model_name"),
                     model_provider=metadata.get("model_provider"),
+                    provider_key=metadata.get("provider_key"),
                     phase=metadata.get("phase"),
                     fallback_used=metadata.get("fallback_used"),
+                    model_status=metadata.get("model_status"),
                 )
                 progress_queue.put_nowait(event)
 
@@ -293,8 +295,10 @@ async def backtest(
                     analysis=analysis,
                     model_name=metadata.get("model_name"),
                     model_provider=metadata.get("model_provider"),
+                    provider_key=metadata.get("provider_key"),
                     phase=metadata.get("phase"),
                     fallback_used=metadata.get("fallback_used"),
+                    model_status=metadata.get("model_status"),
                 )
                 progress_queue.put_nowait(event)
 

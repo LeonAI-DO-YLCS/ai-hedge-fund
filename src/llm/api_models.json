@@ -60,11 +60,6 @@
     "provider": "OpenRouter"
   },
   {
-    "display_name": "GigaChat-2-Max",
-    "model_name": "GigaChat-2-Max",
-    "provider": "GigaChat"
-  },
-  {
     "display_name": "LMStudio (Configured Default)",
     "model_name": "qwen2.5-7b-instruct",
     "provider": "LMStudio"

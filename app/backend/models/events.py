@@ -31,8 +31,10 @@ class ProgressUpdateEvent(BaseEvent):
     analysis: Optional[str] = None
     model_name: Optional[str] = None
     model_provider: Optional[str] = None
+    provider_key: Optional[str] = None
     phase: Optional[str] = None
     fallback_used: Optional[bool] = None
+    model_status: Optional[str] = None
 
 
 class ErrorEvent(BaseEvent):

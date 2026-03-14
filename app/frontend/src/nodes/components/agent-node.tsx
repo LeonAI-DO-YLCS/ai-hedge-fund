@@ -10,10 +10,16 @@ import { ModelSelector } from '@/components/ui/llm-selector';
 import { useFlowContext } from '@/contexts/flow-context';
 import { AgentNodeConfig, useNodeContext } from '@/contexts/node-context';
 import { extractBaseAgentKey } from '@/data/node-mappings';
-import { findModelByIdentity, getModels, LanguageModel } from '@/data/models';
+import {
+  createModelIdentity,
+  findModelByIdentity,
+  getModelIdentity,
+  getModels,
+  LanguageModel,
+} from '@/data/models';
 import { useNodeState } from '@/hooks/use-node-state';
 import { cn } from '@/lib/utils';
-import { agentConfigApi } from '@/services/agent-config-api';
+import { agentConfigApi, AgentConfigurationDetail } from '@/services/agent-config-api';
 import { type AgentNode } from '../types';
 import { getStatusColor } from '../utils';
 import { AgentOutputDialog } from './agent-output-dialog';
@@ -28,6 +34,23 @@ const DEFAULT_AGENT_CONFIG: AgentNodeConfig = {
   maxTokens: null,
   topP: null,
 };
+
+const buildNodeConfig = (
+  detail: AgentConfigurationDetail,
+  models: LanguageModel[]
+): AgentNodeConfig => ({
+  model: findModelByIdentity(models, detail.effective.model_name, detail.effective.model_provider as string | null),
+  fallbackModel: findModelByIdentity(
+    models,
+    detail.effective.fallback_model_name,
+    detail.effective.fallback_model_provider as string | null
+  ),
+  systemPromptOverride: detail.effective.system_prompt_text || '',
+  systemPromptAppend: '',
+  temperature: detail.effective.temperature ?? null,
+  maxTokens: detail.effective.max_tokens ?? null,
+  topP: detail.effective.top_p ?? null,
+});
 
 export function AgentNode({
   data,
@@ -52,6 +75,7 @@ export function AgentNode({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
   const [defaultPrompt, setDefaultPrompt] = useState('');
+  const [detail, setDetail] = useState<AgentConfigurationDetail | null>(null);
   
   // Use persistent state hooks
   const [availableModels, setAvailableModels] = useNodeState<LanguageModel[]>(id, 'availableModels', []);
@@ -62,16 +86,10 @@ export function AgentNode({
   useEffect(() => {
     const syncConfig = async (models: LanguageModel[]) => {
       try {
-        const persistedConfig = await agentConfigApi.getOne(baseAgentKey);
-        setAgentConfigState({
-          model: findModelByIdentity(models, persistedConfig.model_name, persistedConfig.model_provider as string | null),
-          fallbackModel: findModelByIdentity(models, persistedConfig.fallback_model_name, persistedConfig.fallback_model_provider as string | null),
-          systemPromptOverride: persistedConfig.system_prompt_override || '',
-          systemPromptAppend: persistedConfig.system_prompt_append || '',
-          temperature: persistedConfig.temperature ?? null,
-          maxTokens: persistedConfig.max_tokens ?? null,
-          topP: persistedConfig.top_p ?? null,
-        });
+        const effectiveDetail = await agentConfigApi.getOne(baseAgentKey);
+        setDetail(effectiveDetail);
+        setDefaultPrompt(effectiveDetail.defaults.system_prompt_text || '');
+        setAgentConfigState(buildNodeConfig(effectiveDetail, models));
       } catch (error) {
         console.warn(`Failed to sync config for ${baseAgentKey}:`, error);
       }
@@ -126,17 +144,18 @@ export function AgentNode({
   };
 
   const handleUseDefaults = () => {
-    setAgentConfigState(DEFAULT_AGENT_CONFIG);
+    if (!detail) {
+      setAgentConfigState(DEFAULT_AGENT_CONFIG);
+      return;
+    }
+    setAgentConfigState(buildNodeConfig(detail, availableModels));
   };
 
   const handleViewDefaultPrompt = async () => {
     try {
-      const prompt = await agentConfigApi.getDefaultPrompt(baseAgentKey);
+      const prompt = detail?.defaults.system_prompt_text || await agentConfigApi.getDefaultPrompt(baseAgentKey);
       setDefaultPrompt(prompt);
-      setShowDefaultPrompt((prev) => !prev || !prompt ? false : true);
-      if (!showDefaultPrompt) {
-        setShowDefaultPrompt(true);
-      }
+      setShowDefaultPrompt((prev) => !prev);
     } catch (error) {
       console.error(`Failed to load default prompt for ${baseAgentKey}:`, error);
     }
@@ -185,7 +204,9 @@ export function AgentNode({
                     </div>
                     <ModelSelector
                       models={availableModels}
-                      value={agentConfig.model?.model_name || ""}
+                      value={agentConfig.model
+                        ? getModelIdentity(agentConfig.model)
+                        : createModelIdentity(detail?.effective.model_name, detail?.effective.model_provider as string | null)}
                       onChange={handleModelChange}
                       placeholder="Auto"
                     />
@@ -194,7 +215,9 @@ export function AgentNode({
                     </div>
                     <ModelSelector
                       models={availableModels}
-                      value={agentConfig.fallbackModel?.model_name || ""}
+                      value={agentConfig.fallbackModel
+                        ? getModelIdentity(agentConfig.fallbackModel)
+                        : createModelIdentity(detail?.effective.fallback_model_name, detail?.effective.fallback_model_provider as string | null)}
                       onChange={handleFallbackChange}
                       placeholder="Optional fallback"
                     />
@@ -219,26 +242,22 @@ export function AgentNode({
                       />
                     </div>
                     <div className="text-subtitle text-primary flex items-center gap-1 mt-2">
-                      Prompt Override
+                      Effective Prompt
                     </div>
                     <textarea
-                      className="min-h-24 rounded-md border border-border bg-node px-3 py-2 text-sm text-primary"
-                      placeholder="Replace the default system prompt for this node"
+                      className="min-h-32 rounded-md border border-border bg-node px-3 py-2 text-sm text-primary md:min-h-40"
+                      placeholder="Edit the prompt baseline for this node"
                       value={agentConfig.systemPromptOverride}
                       onChange={(event) => setAgentConfigState((prev) => ({ ...prev, systemPromptOverride: event.target.value }))}
                     />
-                    <div className="text-subtitle text-primary flex items-center gap-1 mt-2">
-                      Prompt Append
-                    </div>
-                    <textarea
-                      className="min-h-20 rounded-md border border-border bg-node px-3 py-2 text-sm text-primary"
-                      placeholder="Append extra instructions to the default system prompt"
-                      value={agentConfig.systemPromptAppend}
-                      onChange={(event) => setAgentConfigState((prev) => ({ ...prev, systemPromptAppend: event.target.value }))}
-                    />
+                    {detail && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Prompt source: {detail.sources.system_prompt_text.replace(/_/g, ' ')}
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-2">
                       <Button variant="outline" size="sm" onClick={() => void handleViewDefaultPrompt()}>
-                        View Default
+                        {showDefaultPrompt ? 'Hide Default' : 'View Default'}
                       </Button>
                       <Button variant="ghost" size="sm" onClick={handleUseDefaults}>
                         Reset to Auto

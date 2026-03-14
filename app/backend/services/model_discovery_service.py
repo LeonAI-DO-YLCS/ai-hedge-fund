@@ -6,20 +6,16 @@ import hashlib
 from typing import Any
 
 from app.backend.services.api_key_validator import api_key_validator
-from src.llm.provider_registry import get_provider_entry
+from src.llm.provider_registry import get_provider_entry, normalize_provider_key
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _utc_now_iso() -> str:
-    return _utc_now().isoformat().replace("+00:00", "Z")
-
-
 @dataclass
 class DiscoveryCacheEntry:
-    models: list[dict[str, str]]
+    models: list[dict[str, Any]]
     fetched_at: datetime
     expires_at: datetime
     error: str | None = None
@@ -34,49 +30,67 @@ class ModelDiscoveryService:
     def _fingerprint(self, api_key: str) -> str:
         return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:12]
 
-    def invalidate(self, provider: str | None = None) -> None:
-        if provider is None:
+    def invalidate(self, provider_key: str | None = None) -> None:
+        if provider_key is None:
             self._cache.clear()
             return
+        normalized = normalize_provider_key(provider_key) or provider_key
         for cache_key in list(self._cache.keys()):
-            if cache_key[0] == provider:
+            if cache_key[0] == normalized:
                 self._cache.pop(cache_key, None)
 
-    def get_cached_models(self, provider: str) -> list[dict[str, str]]:
+    def get_cached_models(self, provider_key: str) -> list[dict[str, Any]]:
+        normalized = normalize_provider_key(provider_key) or provider_key
         now = _utc_now()
-        models: list[dict[str, str]] = []
-        for (provider_name, _fingerprint), entry in self._cache.items():
-            if provider_name != provider or entry.expires_at <= now:
+        models: list[dict[str, Any]] = []
+        for (cache_provider_key, _fingerprint), entry in self._cache.items():
+            if cache_provider_key != normalized or entry.expires_at <= now:
                 continue
             models.extend(entry.models)
-        deduped: dict[tuple[str, str], dict[str, str]] = {}
+        deduped: dict[tuple[str, str], dict[str, Any]] = {}
         for model in models:
-            deduped[(model["provider"], model["model_name"])] = model
+            deduped[(str(model.get("provider_key")), str(model.get("model_name")))] = (
+                model
+            )
         return list(deduped.values())
 
     async def discover(
-        self, provider: str, api_key: str, force_refresh: bool = False
+        self,
+        provider: str,
+        api_key: str,
+        force_refresh: bool = False,
+        provider_record: Any | None = None,
     ) -> dict[str, Any]:
-        entry = get_provider_entry(provider)
-        if not entry:
-            raise ValueError("Unknown provider.")
-        if not entry.discovery_supported:
-            raise ValueError(f"{entry.display_name} does not support model discovery.")
+        provider_key = normalize_provider_key(
+            getattr(provider_record, "provider_key", None) or provider
+        ) or str(provider)
+        entry = get_provider_entry(provider_key)
+        display_name = getattr(provider_record, "display_name", None) or (
+            entry.display_name if entry else provider_key
+        )
 
-        cache_key = (entry.display_name, self._fingerprint(api_key.strip()))
+        if provider_record is None and (not entry or not entry.discovery_supported):
+            raise ValueError(f"{display_name} does not support model discovery.")
+
+        cache_key = (provider_key, self._fingerprint(api_key.strip()))
         cached = self._cache.get(cache_key)
         now = _utc_now()
 
         if cached and cached.expires_at > now and not force_refresh:
             return {
-                "provider": entry.display_name,
+                "provider": display_name,
+                "provider_key": provider_key,
                 "cache_state": "fresh",
                 "discovered_at": cached.fetched_at.isoformat().replace("+00:00", "Z"),
                 "expires_at": cached.expires_at.isoformat().replace("+00:00", "Z"),
                 "models": cached.models,
             }
 
-        result = await api_key_validator.validate(provider, api_key)
+        result = await api_key_validator.validate(
+            provider_key,
+            api_key,
+            provider_record=provider_record,
+        )
         if not result.valid:
             raise ValueError(result.error or "Unable to discover models for provider.")
 
@@ -84,8 +98,11 @@ class ModelDiscoveryService:
             {
                 "display_name": model_name,
                 "model_name": model_name,
-                "provider": entry.display_name,
+                "provider": display_name,
+                "provider_key": provider_key,
                 "source": "discovered",
+                "is_enabled": False,
+                "availability_status": "available",
             }
             for model_name in (result.discovered_models or [])
         ]
@@ -98,7 +115,8 @@ class ModelDiscoveryService:
             expires_at=expires_at,
         )
         return {
-            "provider": entry.display_name,
+            "provider": display_name,
+            "provider_key": provider_key,
             "cache_state": "fresh",
             "discovered_at": fetched_at.isoformat().replace("+00:00", "Z"),
             "expires_at": expires_at.isoformat().replace("+00:00", "Z"),

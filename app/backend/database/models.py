@@ -2,14 +2,17 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    UniqueConstraint,
     Float,
     ForeignKey,
     Integer,
+    Index,
     JSON,
     String,
     Text,
 )
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from .connection import Base
 
 
@@ -160,26 +163,77 @@ class ApiKey(Base):
     validation_error = Column(Text, nullable=True)
     last_validated_at = Column(DateTime(timezone=True), nullable=True)
     last_validation_latency_ms = Column(Integer, nullable=True)
+    provider_record_id = Column(
+        Integer, ForeignKey("provider_records.id"), nullable=True, index=True
+    )
 
     # Optional metadata
     description = Column(Text, nullable=True)  # Human-readable description
     last_used = Column(DateTime(timezone=True), nullable=True)  # Track usage
+    provider_record = relationship("ProviderRecord", back_populates="api_keys")
+
+
+class ProviderRecord(Base):
+    """Canonical provider identity for built-in, generic, local, and retired providers."""
+
+    __tablename__ = "provider_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    provider_key = Column(String(100), nullable=False, unique=True, index=True)
+    display_name = Column(String(255), nullable=False)
+    provider_kind = Column(String(50), nullable=False, default="builtin")
+    builtin_provider_key = Column(String(100), nullable=True)
+    connection_mode = Column(String(50), nullable=True)
+    endpoint_url = Column(Text, nullable=True)
+    models_url = Column(Text, nullable=True)
+    auth_mode = Column(String(50), nullable=True)
+    request_defaults = Column(JSON, nullable=True)
+    extra_headers = Column(JSON, nullable=True)
+    is_enabled = Column(Boolean, default=True)
+    is_retired = Column(Boolean, default=False)
+    last_checked_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    api_keys = relationship("ApiKey", back_populates="provider_record")
+    custom_models = relationship("CustomModel", back_populates="provider_record")
 
 
 class CustomModel(Base):
     """Table to store validated user-added custom models."""
 
     __tablename__ = "custom_models"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_record_id",
+            "model_name",
+            name="uq_custom_models_provider_record_model",
+        ),
+        Index("ix_custom_models_provider_record_id", "provider_record_id"),
+        Index("ix_custom_models_availability_status", "availability_status"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     provider = Column(String(100), nullable=False, index=True)
+    provider_record_id = Column(
+        Integer, ForeignKey("provider_records.id"), nullable=True
+    )
     model_name = Column(String(255), nullable=False)
     display_name = Column(String(255), nullable=False)
+    source = Column(String(50), nullable=False, default="manual")
+    is_enabled = Column(Boolean, default=False)
+    availability_status = Column(String(20), default="available")
+    status_reason = Column(Text, nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
     validation_status = Column(String(20), default="valid")
     last_validated_at = Column(DateTime(timezone=True), nullable=True)
+    provider_record = relationship("ProviderRecord", back_populates="custom_models")
 
 
 class AgentConfiguration(Base):

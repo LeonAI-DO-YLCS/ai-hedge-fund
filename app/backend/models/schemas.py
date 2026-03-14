@@ -16,9 +16,11 @@ class FlowRunStatus(str, Enum):
 class AgentModelConfig(BaseModel):
     agent_id: str
     model_name: Optional[str] = None
-    model_provider: Optional[ModelProvider] = None
+    model_provider: Optional[str] = None
+    provider_key: Optional[str] = None
     fallback_model_name: Optional[str] = None
-    fallback_model_provider: Optional[ModelProvider] = None
+    fallback_model_provider: Optional[str] = None
+    fallback_provider_key: Optional[str] = None
     system_prompt_override: Optional[str] = None
     system_prompt_append: Optional[str] = None
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
@@ -140,8 +142,13 @@ class MT5SymbolDiagnosticsResponse(BaseModel):
 class ProviderModelResponse(BaseModel):
     display_name: str
     model_name: str
+    provider_key: Optional[str] = None
     provider: Optional[str] = None
     source: Optional[str] = None
+    is_enabled: bool = False
+    availability_status: Optional[str] = None
+    status_reason: Optional[str] = None
+    last_seen_at: Optional[datetime] = None
     is_custom: bool = False
     is_stale: bool = False
 
@@ -164,7 +171,7 @@ class BaseHedgeFundRequest(BaseModel):
     graph_edges: List[GraphEdge]
     agent_models: Optional[List[AgentModelConfig]] = None
     model_name: Optional[str] = "gpt-4.1"
-    model_provider: Optional[ModelProvider] = ModelProvider.OPENAI
+    model_provider: Optional[str] = ModelProvider.OPENAI.value
     margin_requirement: float = 0.0
     portfolio_positions: Optional[List[PortfolioPosition]] = None
     api_keys: Optional[Dict[str, str]] = None
@@ -173,7 +180,7 @@ class BaseHedgeFundRequest(BaseModel):
         """Extract agent IDs from graph structure"""
         return [node.id for node in self.graph_nodes]
 
-    def get_agent_model_config(self, agent_id: str) -> tuple[str, ModelProvider]:
+    def get_agent_model_config(self, agent_id: str) -> tuple[str, str]:
         """Get model configuration for a specific agent"""
         if self.agent_models:
             # Extract base agent key from unique node ID for matching
@@ -187,10 +194,13 @@ class BaseHedgeFundRequest(BaseModel):
                         config.model_name or self.model_name or "gpt-4.1",
                         config.model_provider
                         or self.model_provider
-                        or ModelProvider.OPENAI,
+                        or ModelProvider.OPENAI.value,
                     )
         # Fallback to global model settings
-        return self.model_name or "gpt-4.1", self.model_provider or ModelProvider.OPENAI
+        return (
+            self.model_name or "gpt-4.1",
+            self.model_provider or ModelProvider.OPENAI.value,
+        )
 
     def get_agent_runtime_config(self, agent_id: str) -> Optional[AgentModelConfig]:
         if not self.agent_models:
@@ -386,11 +396,13 @@ class ApiKeyUpdateRequest(BaseModel):
 
 
 class ApiKeyValidateRequest(BaseModel):
-    provider: str = Field(..., min_length=1, max_length=100)
+    provider: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    provider_key: Optional[str] = Field(default=None, min_length=1, max_length=100)
     key_value: str = Field(..., min_length=1)
 
 
 class ApiKeyValidateResponse(BaseModel):
+    provider_key: Optional[str] = None
     provider: str
     display_name: str
     valid: bool
@@ -406,6 +418,13 @@ class ApiKeyResponse(BaseModel):
 
     id: int
     provider: str
+    provider_key: Optional[str] = None
+    provider_kind: Optional[str] = None
+    connection_mode: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    models_url: Optional[str] = None
+    request_defaults: Optional[Dict[str, Any]] = None
+    extra_headers: Optional[Dict[str, str]] = None
     key_value: str
     is_active: bool
     description: Optional[str]
@@ -427,9 +446,15 @@ class ApiKeySummaryResponse(BaseModel):
 
     id: Optional[int] = None
     provider: str
+    provider_key: Optional[str] = None
     display_name: Optional[str] = None
+    provider_kind: Optional[str] = None
+    connection_mode: Optional[str] = None
     source: Optional[str] = None
     status: str = "unconfigured"
+    group: Optional[str] = None
+    available: bool = False
+    error: Optional[str] = None
     is_active: bool
     description: Optional[str]
     created_at: Optional[datetime] = None
@@ -437,6 +462,9 @@ class ApiKeySummaryResponse(BaseModel):
     last_used: Optional[datetime]
     has_key: bool = True
     has_stored_key: bool = True
+    enabled_model_count: int = 0
+    inventory_count: int = 0
+    collapsed_by_default: bool = True
     last_validated_at: Optional[datetime] = None
     validation_error: Optional[str] = None
     last_validation_latency_ms: Optional[int] = None
@@ -451,8 +479,22 @@ class ApiKeyBulkUpdateRequest(BaseModel):
     api_keys: List[ApiKeyCreateRequest]
 
 
+class ProviderUpsertRequest(BaseModel):
+    provider_key: Optional[str] = None
+    display_name: str = Field(..., min_length=1, max_length=255)
+    provider_kind: str = Field(default="generic")
+    connection_mode: str = Field(..., min_length=1, max_length=50)
+    endpoint_url: Optional[str] = None
+    models_url: Optional[str] = None
+    key_value: Optional[str] = None
+    request_defaults: Optional[Dict[str, Any]] = None
+    extra_headers: Optional[Dict[str, str]] = None
+    is_active: bool = True
+
+
 class CustomModelRequest(BaseModel):
-    provider: str = Field(..., min_length=1, max_length=100)
+    provider: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    provider_key: Optional[str] = Field(default=None, min_length=1, max_length=100)
     model_name: str = Field(..., min_length=1, max_length=255)
     display_name: Optional[str] = Field(default=None, max_length=255)
 
@@ -460,8 +502,13 @@ class CustomModelRequest(BaseModel):
 class CustomModelResponse(BaseModel):
     id: Optional[int] = None
     provider: str
+    provider_key: Optional[str] = None
     model_name: str
     display_name: str
+    source: Optional[str] = None
+    is_enabled: bool = False
+    availability_status: Optional[str] = None
+    status_reason: Optional[str] = None
     validation_status: str = "valid"
     last_validated_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -471,23 +518,40 @@ class CustomModelResponse(BaseModel):
 
 
 class ModelDiscoveryRequest(BaseModel):
-    provider: str = Field(..., min_length=1, max_length=100)
+    provider: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    provider_key: Optional[str] = Field(default=None, min_length=1, max_length=100)
     force_refresh: bool = False
 
 
 class ModelDiscoveryResponse(BaseModel):
     provider: str
+    provider_key: Optional[str] = None
     cache_state: str
     discovered_at: str
     expires_at: str
     models: List[ProviderModelResponse]
 
 
+class ProviderInventoryResponse(BaseModel):
+    provider_key: str
+    display_name: str
+    search_enabled: bool = True
+    inventory: List[ProviderModelResponse] = Field(default_factory=list)
+
+
+class UpdateEnabledModelsRequest(BaseModel):
+    enabled_models: List[str] = Field(default_factory=list)
+
+
+class ProviderSummaryListResponse(BaseModel):
+    providers: List[ApiKeySummaryResponse]
+
+
 class AgentConfigurationUpdateRequest(BaseModel):
     model_name: Optional[str] = None
-    model_provider: Optional[ModelProvider] = None
+    model_provider: Optional[str] = None
     fallback_model_name: Optional[str] = None
-    fallback_model_provider: Optional[ModelProvider] = None
+    fallback_model_provider: Optional[str] = None
     system_prompt_override: Optional[str] = None
     system_prompt_append: Optional[str] = None
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
@@ -496,25 +560,75 @@ class AgentConfigurationUpdateRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
-class AgentConfigurationResponse(BaseModel):
+class AgentConfigurationSummaryResponse(BaseModel):
     agent_key: str
     display_name: str
     description: Optional[str] = None
-    model_name: Optional[str] = None
-    model_provider: Optional[ModelProvider] = None
-    fallback_model_name: Optional[str] = None
-    fallback_model_provider: Optional[ModelProvider] = None
+    updated_at: Optional[datetime] = None
+    has_customizations: bool = False
+    warnings: List[str] = Field(default_factory=list)
+
+
+class AgentConfigurationPersistedResponse(BaseModel):
     system_prompt_override: Optional[str] = None
     system_prompt_append: Optional[str] = None
+    model_name: Optional[str] = None
+    model_provider: Optional[str] = None
+    fallback_model_name: Optional[str] = None
+    fallback_model_provider: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     top_p: Optional[float] = None
+
+
+class AgentConfigurationDefaultsResponse(BaseModel):
+    system_prompt_text: str
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+
+
+class AgentConfigurationEffectiveResponse(BaseModel):
+    system_prompt_text: str
+    prompt_mode: Literal["default", "override", "append"] = "default"
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None
+    top_p: Optional[float] = None
+    model_name: Optional[str] = None
+    model_provider: Optional[str] = None
+    fallback_model_name: Optional[str] = None
+    fallback_model_provider: Optional[str] = None
+
+
+class AgentConfigurationSourcesResponse(BaseModel):
+    system_prompt_text: str
+    temperature: str
+    max_tokens: str
+    top_p: str
+    model_name: str
+    model_provider: str
+    fallback_model_name: str
+    fallback_model_provider: str
+
+
+class AgentConfigurationDetailResponse(BaseModel):
+    agent_key: str
+    display_name: str
+    description: Optional[str] = None
+    persisted: AgentConfigurationPersistedResponse
+    defaults: AgentConfigurationDefaultsResponse
+    effective: AgentConfigurationEffectiveResponse
+    sources: AgentConfigurationSourcesResponse
     warnings: List[str] = Field(default_factory=list)
     updated_at: Optional[datetime] = None
 
 
 class AgentConfigurationListResponse(BaseModel):
-    agents: List[AgentConfigurationResponse]
+    agents: List[AgentConfigurationSummaryResponse]
+
+
+class AgentConfigurationEffectiveUpdateRequest(BaseModel):
+    effective: AgentConfigurationEffectiveResponse
 
 
 class AgentDefaultPromptResponse(BaseModel):

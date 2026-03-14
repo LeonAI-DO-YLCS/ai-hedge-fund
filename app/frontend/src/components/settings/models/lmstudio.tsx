@@ -19,7 +19,7 @@ export function LMStudioSettings() {
         api.getLanguageModelProviders(),
         api.getLanguageModels(),
       ]);
-      const lmstudio = providers.find((p) => p.name === 'LMStudio') || null;
+      const lmstudio = providers.find((p) => p.provider_key === 'lmstudio' || p.display_name === 'LMStudio') || null;
       setProvider(lmstudio);
       setModels(allModels.filter((m) => m.provider === 'LMStudio'));
       setError(null);

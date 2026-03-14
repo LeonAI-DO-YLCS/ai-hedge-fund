@@ -180,12 +180,14 @@ export function StockAnalyzerNode({
     for (const node of agentNodes) {
       const config = allAgentConfigs[node.id];
       if (config) {
-          agentModels.push({
+        agentModels.push({
           agent_id: node.id,
           model_name: config.model?.model_name,
-          model_provider: config.model?.provider as ModelProvider,
+          model_provider: config.model?.provider as ModelProvider | string,
+          provider_key: config.model?.provider_key,
           fallback_model_name: config.fallbackModel?.model_name,
-          fallback_model_provider: config.fallbackModel?.provider as ModelProvider,
+          fallback_model_provider: config.fallbackModel?.provider as ModelProvider | string,
+          fallback_provider_key: config.fallbackModel?.provider_key,
           system_prompt_override: config.systemPromptOverride || undefined,
           system_prompt_append: config.systemPromptAppend || undefined,
           temperature: config.temperature ?? undefined,

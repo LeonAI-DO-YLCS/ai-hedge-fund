@@ -16,7 +16,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { type LanguageModel } from "@/data/models"
+import {
+  getModelIdentity,
+  parseModelIdentity,
+  type LanguageModel,
+} from "@/data/models"
 import { cn } from "@/lib/utils"
 
 interface ModelSelectorProps {
@@ -35,6 +39,11 @@ export function ModelSelector({
   const [open, setOpen] = React.useState(false)
   const [staleSelection, setStaleSelection] = React.useState(false)
   const [lastSelectedProvider, setLastSelectedProvider] = React.useState<string | null>(null)
+  const selectedModel = React.useMemo(
+    () => models.find((model) => getModelIdentity(model) === value) ?? null,
+    [models, value]
+  )
+  const parsedSelection = React.useMemo(() => parseModelIdentity(value), [value])
 
   React.useEffect(() => {
     if (!value) {
@@ -42,15 +51,14 @@ export function ModelSelector({
       return
     }
 
-    const selected = models.find((model) => model.model_name === value)
-    if (selected) {
+    if (selectedModel) {
       setStaleSelection(false)
-      setLastSelectedProvider(selected.provider)
+      setLastSelectedProvider(selectedModel.provider_key || selectedModel.provider)
       return
     }
 
     setStaleSelection(true)
-  }, [models, value])
+  }, [selectedModel, value])
 
   return (
     <div className="space-y-1">
@@ -63,9 +71,11 @@ export function ModelSelector({
             className="w-full justify-between bg-node border border-border"
           >
             <span className="text-subtitle">
-              {value
-                ? models.find((model) => model.model_name === value)?.display_name || `${value} (Unavailable)`
-                : placeholder}
+              {selectedModel
+                ? selectedModel.display_name
+                : parsedSelection
+                  ? `${parsedSelection.model_name} (Unavailable)`
+                  : placeholder}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0" />
           </Button>
@@ -76,67 +86,73 @@ export function ModelSelector({
             <CommandList className="bg-node">
               <CommandEmpty>No model found.</CommandEmpty>
               <CommandGroup>
-                {models.map((model) => (
-                  <CommandItem
-                    key={model.model_name}
-                    value={model.model_name}
-                    className={cn(
-                      "cursor-pointer bg-node hover:bg-accent",
-                      value === model.model_name && "bg-blue-600/10 border-l-2 border-blue-500/50"
-                    )}
-                    onSelect={(currentValue) => {
-                      if (currentValue === value) {
-                        onChange(null);
-                        setOpen(false);
-                        return;
-                      }
-
-                      const selectedModel = models.find(m => m.model_name === currentValue);
-                      if (!selectedModel) {
-                        setOpen(false);
-                        return;
-                      }
-
-                      // If previous LMStudio selection became stale, require explicit confirmation
-                      // before switching to a new fallback model/provider.
-                      if (staleSelection && lastSelectedProvider === "LMStudio") {
-                        const confirmed = window.confirm(
-                          "The selected LMStudio model is unavailable. Switch to this fallback model?"
-                        );
-                        if (!confirmed) {
-                          setOpen(false);
-                          return;
+                {models.map((model) => {
+                  const modelIdentity = getModelIdentity(model)
+                  return (
+                    <CommandItem
+                      key={modelIdentity}
+                      value={modelIdentity}
+                      className={cn(
+                        "cursor-pointer bg-node hover:bg-accent",
+                        value === modelIdentity && "bg-blue-600/10 border-l-2 border-blue-500/50"
+                      )}
+                      onSelect={(currentValue) => {
+                        if (currentValue === value) {
+                          onChange(null)
+                          setOpen(false)
+                          return
                         }
-                      }
 
-                      onChange(selectedModel);
-                      setLastSelectedProvider(selectedModel.provider);
-                      setOpen(false);
-                    }}
-                  >
-                    <div className="flex items-center justify-between w-full gap-3">
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-title">{model.display_name}</span>
-                        <span className="text-xs text-muted-foreground font-mono">{model.model_name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {model.is_custom && (
-                          <Badge className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
-                            Custom
+                        const nextModel = models.find((item) => getModelIdentity(item) === currentValue)
+                        if (!nextModel) {
+                          setOpen(false)
+                          return
+                        }
+
+                        if (staleSelection && lastSelectedProvider === "LMStudio") {
+                          const confirmed = window.confirm(
+                            "The selected LMStudio model is unavailable. Switch to this fallback model?"
+                          )
+                          if (!confirmed) {
+                            setOpen(false)
+                            return
+                          }
+                        }
+
+                        onChange(nextModel)
+                        setLastSelectedProvider(nextModel.provider_key || nextModel.provider)
+                        setOpen(false)
+                      }}
+                    >
+                      <div className="flex items-center justify-between w-full gap-3">
+                        <div className="flex flex-col items-start min-w-0 flex-1">
+                          <span className="text-title">{model.display_name}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{model.model_name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {model.is_custom && (
+                            <Badge className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
+                              Custom
+                            </Badge>
+                          )}
+                          {model.is_stale && (
+                            <Badge className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
+                              Stale
+                            </Badge>
+                          )}
+                          <Badge className="text-xs text-primary bg-primary/10 border-primary/30 hover:bg-primary/20 hover:border-primary/50">
+                            {model.provider}
                           </Badge>
-                        )}
-                        {model.is_stale && (
-                          <Badge className="text-xs text-amber-400 bg-amber-500/10 border-amber-500/30">
-                            Stale
-                          </Badge>
-                        )}
-                        <Badge className="text-xs text-primary bg-primary/10 border-primary/30 hover:bg-primary/20 hover:border-primary/50">
-                          {model.provider}
-                        </Badge>
+                          {model.provider_key && model.provider_key !== model.provider && (
+                            <Badge className="text-xs text-muted-foreground bg-muted/10 border-border">
+                              {model.provider_key}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CommandItem>
-                ))}
+                    </CommandItem>
+                  )
+                })}
               </CommandGroup>
             </CommandList>
           </Command>
@@ -144,7 +160,7 @@ export function ModelSelector({
       </Popover>
       {staleSelection && (
         <p className="text-xs text-yellow-500">
-          Selected model is unavailable. Choose a fallback model to continue.
+          Selected model is unavailable for {parsedSelection?.provider_identity || lastSelectedProvider || 'this provider'}. Choose a replacement to continue.
         </p>
       )}
     </div>

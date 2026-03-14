@@ -3,7 +3,10 @@ import { api } from '@/services/api';
 export interface LanguageModel {
   display_name: string;
   model_name: string;
+  provider_key?: string;
   source?: string;
+  is_enabled?: boolean;
+  availability_status?: string | null;
   is_custom?: boolean;
   is_stale?: boolean;
   provider:
@@ -16,10 +19,43 @@ export interface LanguageModel {
     | "LMStudio"
     | "OpenRouter"
     | "xAI"
-    | "GigaChat"
     | "Azure OpenAI"
     | string;
 }
+
+export const getModelProviderIdentity = (model: LanguageModel): string => {
+  return model.provider_key || model.provider;
+};
+
+export const createModelIdentity = (
+  modelName?: string | null,
+  providerIdentity?: string | null
+): string => {
+  if (!modelName) {
+    return '';
+  }
+  return providerIdentity ? `${providerIdentity}::${modelName}` : modelName;
+};
+
+export const getModelIdentity = (model: LanguageModel): string => {
+  return createModelIdentity(model.model_name, getModelProviderIdentity(model));
+};
+
+export const parseModelIdentity = (
+  identity?: string | null
+): { model_name: string; provider_identity: string | null } | null => {
+  if (!identity) {
+    return null;
+  }
+  const separator = identity.indexOf('::');
+  if (separator === -1) {
+    return { model_name: identity, provider_identity: null };
+  }
+  return {
+    provider_identity: identity.slice(0, separator) || null,
+    model_name: identity.slice(separator + 2),
+  };
+};
 
 // Cache for models to avoid repeated API calls
 let languageModels: LanguageModel[] | null = null;
@@ -31,13 +67,21 @@ export const clearModelsCache = (): void => {
 export const findModelByIdentity = (
   models: LanguageModel[],
   modelName?: string | null,
-  provider?: string | null
+  providerIdentity?: string | null
 ): LanguageModel | null => {
   if (!modelName) {
     return null;
   }
   return (
-    models.find((model) => model.model_name === modelName && (!provider || model.provider === provider))
+    models.find((model) => {
+      if (model.model_name !== modelName) {
+        return false;
+      }
+      if (!providerIdentity) {
+        return true;
+      }
+      return model.provider_key === providerIdentity || model.provider === providerIdentity;
+    })
     || models.find((model) => model.model_name === modelName)
     || null
   );
@@ -67,7 +111,7 @@ export const getModels = async (): Promise<LanguageModel[]> => {
 export const getDefaultModel = async (): Promise<LanguageModel | null> => {
   try {
     const models = await getModels();
-    return models.find(model => model.model_name === "gpt-4.1") || models[0] || null;
+    return models[0] || null;
   } catch (error) {
     console.error('Failed to get default model:', error);
     return null;

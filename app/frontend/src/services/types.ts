@@ -9,16 +9,17 @@ export enum ModelProvider {
   LMSTUDIO = 'LMStudio',
   OPENROUTER = 'OpenRouter',
   XAI = 'xAI',
-  GIGACHAT = 'GigaChat',
   AZURE_OPENAI = 'Azure OpenAI',
 }
 
 export interface AgentModelConfig {
   agent_id: string;
   model_name?: string;
-  model_provider?: ModelProvider;
+  model_provider?: ModelProvider | string;
+  provider_key?: string;
   fallback_model_name?: string;
-  fallback_model_provider?: ModelProvider;
+  fallback_model_provider?: ModelProvider | string;
+  fallback_provider_key?: string;
   system_prompt_override?: string;
   system_prompt_append?: string;
   temperature?: number;
@@ -54,7 +55,7 @@ export interface BaseHedgeFundRequest {
   graph_edges: GraphEdge[];
   agent_models?: AgentModelConfig[];
   model_name?: string;
-  model_provider?: ModelProvider;
+  model_provider?: ModelProvider | string;
   margin_requirement?: number;
   portfolio_positions?: PortfolioPosition[];
 }
