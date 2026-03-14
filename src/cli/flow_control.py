@@ -19,6 +19,7 @@ import os
 import sys
 
 BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
+TIMEOUT = 15
 
 def catalog_command(args):
     """Retrieve and display catalog information."""
@@ -28,12 +29,23 @@ def catalog_command(args):
         url = f"{BASE_URL}/flow-catalog/{category}"
         
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
         print(json.dumps(data, indent=2))
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Unable to connect to backend at {BASE_URL}. Is it running?", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print(f"Error: Request to backend timed out.", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"API Error fetching catalog: {e}", file=sys.stderr)
+        if 'response' in locals() and hasattr(response, "text"):
+            print(f"Details: {response.text}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error fetching catalog: {e}", file=sys.stderr)
+        print(f"Unexpected error fetching catalog: {e}", file=sys.stderr)
         sys.exit(1)
 
 def manifest_command(args):
@@ -42,45 +54,56 @@ def manifest_command(args):
     flow_id = getattr(args, "flow_id", None)
     file_path = getattr(args, "file", None)
     
-    if subaction == "import":
-        if not file_path:
-            print("Error: --file required for import", file=sys.stderr)
-            sys.exit(1)
-        with open(file_path, "r") as f:
-            manifest = json.load(f)
-        url = f"{BASE_URL}/flows/import"
-        response = requests.post(url, json={"manifest": manifest, "options": {}})
-        
-    elif subaction == "export":
-        url = f"{BASE_URL}/flows/export/{flow_id}"
-        response = requests.get(url)
-        
-    elif subaction == "validate":
-        url = f"{BASE_URL}/flows/{flow_id}/validate"
-        response = requests.post(url)
-        
-    elif subaction == "compile":
-        url = f"{BASE_URL}/flows/{flow_id}/compile"
-        response = requests.post(url)
-        
-    else:
-        print(f"Unknown subaction: {subaction}", file=sys.stderr)
-        sys.exit(1)
-        
     try:
+        if subaction == "import":
+            if not file_path:
+                print("Error: --file required for import", file=sys.stderr)
+                sys.exit(1)
+            with open(file_path, "r") as f:
+                manifest = json.load(f)
+            url = f"{BASE_URL}/flows/import"
+            response = requests.post(url, json={"manifest": manifest, "options": {}}, timeout=TIMEOUT)
+            
+        elif subaction == "export":
+            url = f"{BASE_URL}/flows/export/{flow_id}"
+            response = requests.get(url, timeout=TIMEOUT)
+            
+        elif subaction == "validate":
+            url = f"{BASE_URL}/flows/{flow_id}/validate"
+            response = requests.post(url, timeout=TIMEOUT)
+            
+        elif subaction == "compile":
+            url = f"{BASE_URL}/flows/{flow_id}/compile"
+            response = requests.post(url, timeout=TIMEOUT)
+            
+        else:
+            print(f"Unknown subaction: {subaction}", file=sys.stderr)
+            sys.exit(1)
+            
         response.raise_for_status()
         data = response.json()
         
         if subaction == "export" and file_path:
+            dir_name = os.path.dirname(file_path)
+            if dir_name:
+                os.makedirs(dir_name, exist_ok=True)
             with open(file_path, "w") as f:
                 json.dump(data, f, indent=2)
             print(f"Manifest exported to {file_path}")
         else:
             print(json.dumps(data, indent=2))
             
-    except Exception as e:
-        print(f"Error during {subaction}: {e}", file=sys.stderr)
-        # Handle case where response might not be defined if requests failed early
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Unable to connect to backend at {BASE_URL}. Is it running?", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print(f"Error: Request to backend timed out.", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"API Error during {subaction}: {e}", file=sys.stderr)
         if 'response' in locals() and hasattr(response, "text"):
-            print(response.text, file=sys.stderr)
+            print(f"Details: {response.text}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error during {subaction}: {e}", file=sys.stderr)
         sys.exit(1)

@@ -118,6 +118,41 @@ class RunJournalRepository:
         journal.is_finalized = True
         self.db.commit()
 
+    def create_artifact(self, run_id: int, artifact_type: str, format: str, storage_ref: str, retention_policy: str = "default") -> ArtifactRecord:
+        """Create a new artifact record linked to a run."""
+        import uuid
+        from datetime import datetime, timezone
+        
+        artifact_id = f"artifact-{run_id}-{uuid.uuid4().hex[:8]}"
+        artifact = ArtifactRecord(
+            run_id=run_id,
+            artifact_id=artifact_id,
+            artifact_type=artifact_type,
+            format=format,
+            storage_ref=storage_ref,
+            retention_policy=retention_policy,
+            created_at=datetime.now(timezone.utc)
+        )
+        self.db.add(artifact)
+        
+        journal = self.db.query(RunJournal).filter(RunJournal.run_id == run_id).first()
+        if journal:
+            if journal.artifact_index is None:
+                journal.artifact_index = []
+            index = list(journal.artifact_index)
+            index.append({
+                "artifact_id": artifact_id,
+                "artifact_type": artifact_type,
+                "format": format,
+                "storage_ref": storage_ref,
+                "created_at": artifact.created_at.isoformat()
+            })
+            journal.artifact_index = index
+            
+        self.db.commit()
+        self.db.refresh(artifact)
+        return artifact
+
     def get_journal(self, run_id: int) -> RunJournal | None:
         """Return the full run journal."""
         return self.db.query(RunJournal).filter(RunJournal.run_id == run_id).first()

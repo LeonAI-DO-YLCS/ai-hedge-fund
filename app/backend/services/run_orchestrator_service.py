@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from app.backend.services.flow_manifest_service import FlowManifestService
 from app.backend.services.flow_compiler_service import FlowCompilerService
-from app.backend.repositories.flow_repository import FlowRepository
+from app.backend.repositories.flow_run_repository import FlowRunRepository
 from app.backend.models.schemas import FlowRunStatus
 
 
@@ -36,7 +36,7 @@ class RunOrchestratorService:
         self, 
         manifest_service: FlowManifestService,
         compiler_service: FlowCompilerService,
-        run_repo: FlowRepository
+        run_repo: FlowRunRepository
     ) -> None:
         self.manifest_service = manifest_service
         self.compiler_service = compiler_service
@@ -59,8 +59,18 @@ class RunOrchestratorService:
         
         # 3. Handle Live Intent Enforcement (T035)
         is_live = profile_name.lower() == "live" or operator_context.get("intent") == "live"
-        if is_live and not operator_context.get("confirmed"):
-             return {"status": "error", "message": "Live intent requires manual confirmation"}
+        if is_live:
+            if not operator_context.get("confirmed"):
+                return {"status": "error", "message": "Live intent requires manual confirmation"}
+                
+            compiled_req = compiled.get("compiled_request", {})
+            nodes = compiled_req.get("nodes", [])
+            has_risk_manager = any(
+                node.get("type") == "risk_manager" or "risk_manager" in node.get("id", "").lower() 
+                for node in nodes
+            )
+            if not has_risk_manager:
+                return {"status": "error", "message": "Live intent requires a risk_manager node in the compiled graph structure"}
              
         # 4. Create Run Record (HedgeFundFlowRun)
         run = self.run_repo.create_flow_run(
@@ -101,6 +111,19 @@ class RunOrchestratorService:
         }
         if run_id in self._event_queues:
             self._event_queues[run_id].append(event)
+            
+        try:
+            from app.backend.services.sse_stream_service import sse_stream_service
+            from app.backend.models.events import ProgressUpdateEvent
+            sse_event = ProgressUpdateEvent(
+                run_id=run_id,
+                agent=agent,
+                status=status,
+                phase="orchestration"
+            )
+            sse_stream_service.push_event(run_id, sse_event)
+        except Exception:
+            pass
             
     async def stream_events(self, run_id: int):
         """Generator for SSE event streaming."""

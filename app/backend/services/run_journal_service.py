@@ -58,6 +58,16 @@ class RunJournalService:
         """Record a trade entry."""
         self.repo.append_trade(run_id, trade)
 
+    def record_artifact(self, run_id: int, artifact_type: str, format: str, storage_ref: str, retention_policy: str = "default") -> dict:
+        """Record metadata about a generated file/blob and link it via ArtifactRecord."""
+        artifact = self.repo.create_artifact(run_id, artifact_type, format, storage_ref, retention_policy)
+        return {
+            "artifact_id": artifact.artifact_id,
+            "artifact_type": artifact.artifact_type,
+            "format": artifact.format,
+            "storage_ref": artifact.storage_ref
+        }
+
     def finalize_journal(self, run_id: int, outcome: str, diagnostics: list) -> None:
         """Finalize the journal after run completion (normal/degraded/cancelled/failed)."""
         self.repo.finalize_journal(run_id, outcome, diagnostics)

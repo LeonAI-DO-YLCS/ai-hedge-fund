@@ -26,7 +26,7 @@ from app.backend.services.flow_manifest_service import FlowManifestService
 from app.backend.services.flow_compiler_service import FlowCompilerService
 from app.backend.services.flow_catalog_service import FlowCatalogService
 from app.backend.services.mt5_symbol_resolver_service import MT5SymbolResolverService
-from app.backend.repositories.flow_repository import FlowRepository
+from app.backend.repositories.flow_run_repository import FlowRunRepository
 from app.backend.repositories.flow_manifest_repository import FlowManifestRepository
 from app.backend.services.sse_stream_service import sse_stream_service
 
@@ -41,7 +41,7 @@ def get_orchestrator(db: Session = Depends(get_db)) -> RunOrchestratorService:
     resolver = MT5SymbolResolverService()
     compiler = FlowCompilerService(catalog, resolver)
     
-    run_repo = FlowRepository(db)
+    run_repo = FlowRunRepository(db)
     return RunOrchestratorService(m_service, compiler, run_repo)
 
 

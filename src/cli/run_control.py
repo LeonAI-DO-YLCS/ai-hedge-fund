@@ -19,6 +19,7 @@ import sys
 import time
 
 BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
+TIMEOUT = 15
 
 def start_run_command(args):
     """Launch a governed run from a manifest."""
@@ -31,13 +32,24 @@ def start_run_command(args):
             "flow_id": flow_id,
             "profile_name": profile,
             "live_intent_confirmed": True # CLI defaults to confirm if run is called
-        })
+        }, timeout=TIMEOUT)
         response.raise_for_status()
         data = response.json()
         print(f"Run launched successfully!")
         print(json.dumps(data, indent=2))
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Unable to connect to backend at {BASE_URL}. Is it running?", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print(f"Error: Request to backend timed out.", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"API Error launching run: {e}", file=sys.stderr)
+        if 'response' in locals() and hasattr(response, "text"):
+            print(f"Details: {response.text}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error launching run: {e}", file=sys.stderr)
+        print(f"Unexpected error launching run: {e}", file=sys.stderr)
         sys.exit(1)
 
 def stop_run_command(args):
@@ -45,11 +57,22 @@ def stop_run_command(args):
     run_id = args.run_id
     url = f"{BASE_URL}/runs/{run_id}/cancel"
     try:
-        response = requests.post(url)
+        response = requests.post(url, timeout=TIMEOUT)
         response.raise_for_status()
         print(json.dumps(response.json(), indent=2))
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Unable to connect to backend at {BASE_URL}. Is it running?", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print(f"Error: Request to backend timed out.", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"API Error stopping run: {e}", file=sys.stderr)
+        if 'response' in locals() and hasattr(response, "text"):
+            print(f"Details: {response.text}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error stopping run: {e}", file=sys.stderr)
+        print(f"Unexpected error stopping run: {e}", file=sys.stderr)
         sys.exit(1)
 
 def monitor_run_command(args):
@@ -59,7 +82,7 @@ def monitor_run_command(args):
     
     try:
         # requests-sse or just raw stream handling
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, timeout=TIMEOUT)
         response.raise_for_status()
         
         print(f"Started monitoring run {run_id}...")
@@ -71,10 +94,21 @@ def monitor_run_command(args):
                     try:
                         event = json.loads(event_data)
                         print(f"[{event.get('timestamp', 'N/A')}] {event.get('agent', 'system')}: {event.get('status', '')}")
-                    except:
+                    except json.JSONDecodeError:
                         print(decoded_line)
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Unable to connect to backend at {BASE_URL}. Is it running?", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print(f"Error: Request to backend timed out.", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"API Error monitoring run: {e}", file=sys.stderr)
+        if 'response' in locals() and hasattr(response, "text"):
+            print(f"Details: {response.text}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error monitoring run: {e}", file=sys.stderr)
+        print(f"Unexpected error monitoring run: {e}", file=sys.stderr)
         sys.exit(1)
 
 def audit_run_command(args):
@@ -84,9 +118,20 @@ def audit_run_command(args):
     
     url = f"{BASE_URL}/runs/{run_id}/{subaction}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=TIMEOUT)
         response.raise_for_status()
         print(json.dumps(response.json(), indent=2))
+    except requests.exceptions.ConnectionError:
+        print(f"Error: Unable to connect to backend at {BASE_URL}. Is it running?", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.Timeout:
+        print(f"Error: Request to backend timed out.", file=sys.stderr)
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"API Error fetching audit data: {e}", file=sys.stderr)
+        if 'response' in locals() and hasattr(response, "text"):
+            print(f"Details: {response.text}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error fetching audit data: {e}", file=sys.stderr)
+        print(f"Unexpected error fetching audit data: {e}", file=sys.stderr)
         sys.exit(1)
