@@ -67,6 +67,8 @@ Before finalizing your output, silently verify:
 - SQLite (`app/backend/hedge_fund.db`) for persisted settings, `.env` for backward-compatible key fallback, source-controlled JSON model catalogs, and in-memory TTL caches for discovered models (009-llm-provider-management)
 - Python 3.11+ for backend/runtime, TypeScript 5.x with React 18 for frontend + FastAPI, Pydantic, SQLAlchemy, Alembic, httpx, LangChain, LangGraph, React, Vite, Tailwind CSS, lucide-react (010-streamline-provider-config)
 - SQLite (`app/backend/hedge_fund.db`) for provider, model, and agent settings; `.env` for backward-compatible credential fallback; in-memory TTL caches for provider discovery/probe results; source-controlled provider metadata only (010-streamline-provider-config)
+- Python 3.11+ for backend, orchestration, and CLI-facing surfaces; existing TypeScript/React frontend remains untouched + FastAPI, Pydantic, SQLAlchemy, Alembic, LangGraph, requests, pandas, PyYAML, pytest (011-cli-flow-manifest)
+- SQLite at `app/backend/hedge_fund.db`, JSON-backed flow and run payloads, file-based import/export artifacts, YAML symbol mappings in `mt5-connection-bridge/config/symbols.yaml` (011-cli-flow-manifest)
 
 ## Recent Changes
 - 002-validate-v75-plan: Added Python 3.11 + pandas, numpy, scipy, statsmodels, arch, matplotlib, PyYAML, pytest
