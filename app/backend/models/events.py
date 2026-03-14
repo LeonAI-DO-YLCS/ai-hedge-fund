@@ -18,6 +18,9 @@ class StartEvent(BaseEvent):
 
     type: Literal["start"] = "start"
     timestamp: Optional[str] = None
+    run_id: Optional[int] = None
+    flow_id: Optional[int] = None
+    profile_name: Optional[str] = None
 
 
 class ProgressUpdateEvent(BaseEvent):
@@ -35,6 +38,8 @@ class ProgressUpdateEvent(BaseEvent):
     phase: Optional[str] = None
     fallback_used: Optional[bool] = None
     model_status: Optional[str] = None
+    run_id: Optional[int] = None
+    swarm_id: Optional[str] = None
 
 
 class ErrorEvent(BaseEvent):
@@ -43,6 +48,8 @@ class ErrorEvent(BaseEvent):
     type: Literal["error"] = "error"
     message: str
     timestamp: Optional[str] = None
+    run_id: Optional[int] = None
+    severity: str = "error"  # error, warning, critical
 
 
 class CompleteEvent(BaseEvent):
@@ -51,3 +58,5 @@ class CompleteEvent(BaseEvent):
     type: Literal["complete"] = "complete"
     data: Dict[str, Any]
     timestamp: Optional[str] = None
+    run_id: Optional[int] = None
+    final_status: str = "COMPLETE"

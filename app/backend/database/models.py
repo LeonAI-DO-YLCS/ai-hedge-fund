@@ -41,6 +41,49 @@ class HedgeFundFlow(Base):
     is_template = Column(Boolean, default=False)  # Mark as template for reuse
     tags = Column(JSON, nullable=True)  # Store tags for categorization
 
+    # Relationships
+    manifests = relationship("CanonicalManifest", back_populates="flow")
+    identifier_mappings = relationship("IdentifierMapping", back_populates="flow")
+
+
+class CanonicalManifest(Base):
+    """Canonical versioned definition of a flow"""
+
+    __tablename__ = "canonical_manifests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flow_id = Column(
+        Integer, ForeignKey("hedge_fund_flows.id"), nullable=True, index=True
+    )
+    manifest_version = Column(String(50), nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    payload = Column(JSON, nullable=False)  # Entire manifest JSON
+    is_template = Column(Boolean, default=False)
+    tags = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    flow = relationship("HedgeFundFlow", back_populates="manifests")
+
+
+class IdentifierMapping(Base):
+    """Compatibility map between canonical stable IDs and legacy IDs"""
+
+    __tablename__ = "identifier_mappings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    flow_id = Column(
+        Integer, ForeignKey("hedge_fund_flows.id"), nullable=False, index=True
+    )
+    mapping_scope = Column(String(50), nullable=False)  # node, edge, swarm, artifact
+    canonical_id = Column(String(255), nullable=False)
+    legacy_id = Column(String(255), nullable=False)
+    source = Column(String(100), nullable=True)
+    active = Column(Boolean, default=True)
+
+    flow = relationship("HedgeFundFlow", back_populates="identifier_mappings")
+
 
 class HedgeFundFlowRun(Base):
     """Table to track individual execution runs of a hedge fund flow"""
@@ -57,14 +100,15 @@ class HedgeFundFlowRun(Base):
     # Run execution tracking
     status = Column(
         String(50), nullable=False, default="IDLE"
-    )  # IDLE, IN_PROGRESS, COMPLETE, ERROR
+    )  # IDLE, IN_PROGRESS, COMPLETE, ERROR, CANCELLED
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Run configuration
     trading_mode = Column(
         String(50), nullable=False, default="one-time"
-    )  # one-time, continuous, advisory
+    )  # one-time, continuous, advisory, backtest, paper, live-intent
+    profile_name = Column(String(100), nullable=True)  # Named run profile used
     schedule = Column(
         String(50), nullable=True
     )  # hourly, daily, weekly (for continuous mode)
@@ -81,10 +125,61 @@ class HedgeFundFlowRun(Base):
     results = Column(JSON, nullable=True)  # Store the output/results from the run
     error_message = Column(Text, nullable=True)  # Store error details if run failed
 
+    # Lifecycle control
+    cancellation_requested = Column(Boolean, default=False)
+
     # Metadata
     run_number = Column(
         Integer, nullable=False, default=1
     )  # Sequential run number for this flow
+
+    # Relationships
+    journal = relationship("RunJournal", back_populates="run", uselist=False)
+    artifacts = relationship("ArtifactRecord", back_populates="run")
+
+
+class RunJournal(Base):
+    """Audit record for what happened during a run"""
+
+    __tablename__ = "run_journals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(
+        Integer, ForeignKey("hedge_fund_flow_runs.id"), nullable=False, unique=True, index=True
+    )
+    manifest_snapshot = Column(JSON, nullable=False)
+    compiled_request_snapshot = Column(JSON, nullable=True)
+    resolved_symbol_snapshot = Column(JSON, nullable=True)
+    bridge_provenance_snapshot = Column(JSON, nullable=True)
+    analyst_progress_events = Column(JSON, nullable=True)
+    analyst_outputs = Column(JSON, nullable=True)
+    decision_records = Column(JSON, nullable=True)
+    trade_records = Column(JSON, nullable=True)
+    portfolio_snapshots = Column(JSON, nullable=True)
+    artifact_index = Column(JSON, nullable=True)
+    diagnostics = Column(JSON, nullable=True)
+    is_finalized = Column(Boolean, default=False)
+
+    run = relationship("HedgeFundFlowRun", back_populates="journal")
+
+
+class ArtifactRecord(Base):
+    """Indexed output produced by a run"""
+
+    __tablename__ = "artifact_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(
+        Integer, ForeignKey("hedge_fund_flow_runs.id"), nullable=False, index=True
+    )
+    artifact_id = Column(String(255), nullable=False, unique=True)
+    artifact_type = Column(String(100), nullable=False)
+    format = Column(String(50), nullable=False)
+    storage_ref = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    retention_policy = Column(String(100), nullable=True)
+
+    run = relationship("HedgeFundFlowRun", back_populates="artifacts")
 
 
 class HedgeFundFlowRunCycle(Base):

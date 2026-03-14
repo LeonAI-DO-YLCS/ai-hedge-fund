@@ -3,14 +3,28 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional, Dict, Any, Literal
 from src.llm.models import ModelProvider
 from enum import Enum
-from app.backend.services.graph import extract_base_agent_key
-
+import re
 
 class FlowRunStatus(str, Enum):
     IDLE = "IDLE"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETE = "COMPLETE"
     ERROR = "ERROR"
+    CANCELLED = "CANCELLED"
+
+
+def extract_base_agent_key(unique_id: str) -> str:
+    """
+    Extract the base agent key from a unique node ID. (Blueprint Section 19.3)
+    """
+    # For agent nodes, remove the last underscore and 6-character suffix
+    parts = unique_id.split('_')
+    if len(parts) >= 2:
+        last_part = parts[-1]
+        # If the last part is a 6-character alphanumeric string, it's likely our suffix
+        if len(last_part) == 6 and re.match(r'^[a-z0-9]+$', last_part):
+            return '_'.join(parts[:-1])
+    return unique_id
 
 
 class AgentModelConfig(BaseModel):
@@ -94,6 +108,23 @@ class MT5SymbolsResponse(BaseModel):
     count: int
     last_refreshed_at: str
     error: Optional[str] = None
+
+
+class FlowRunLaunchRequest(BaseModel):
+    flow_id: int
+    profile_name: str = "default"
+    overrides: Optional[Dict[str, Any]] = None
+    live_intent_confirmed: bool = False
+
+
+class FlowRunResponse(BaseModel):
+    run_id: int
+    flow_id: int
+    profile_name: str
+    status: str
+    mode: Optional[str] = None
+    events_url: Optional[str] = None
+    details_url: Optional[str] = None
 
 
 class MT5MetricsResponse(BaseModel):
@@ -181,35 +212,56 @@ class BaseHedgeFundRequest(BaseModel):
         return [node.id for node in self.graph_nodes]
 
     def get_agent_model_config(self, agent_id: str) -> tuple[str, str]:
-        """Get model configuration for a specific agent"""
-        if self.agent_models:
-            # Extract base agent key from unique node ID for matching
-            base_agent_key = extract_base_agent_key(agent_id)
+        """Get model configuration for a specific agent with exact-match precedence."""
+        if not self.agent_models:
+            return (
+                self.model_name or "gpt-4.1",
+                self.model_provider or ModelProvider.OPENAI.value,
+            )
 
-            for config in self.agent_models:
-                # Check both unique node ID and base agent key for matches
-                config_base_key = extract_base_agent_key(config.agent_id)
-                if config.agent_id == agent_id or config_base_key == base_agent_key:
-                    return (
-                        config.model_name or self.model_name or "gpt-4.1",
-                        config.model_provider
-                        or self.model_provider
-                        or ModelProvider.OPENAI.value,
-                    )
-        # Fallback to global model settings
+        # 1. Try exact node ID match first (Blueprint Section 19.5)
+        for config in self.agent_models:
+            if config.agent_id == agent_id:
+                return (
+                    config.model_name or self.model_name or "gpt-4.1",
+                    config.model_provider
+                    or self.model_provider
+                    or ModelProvider.OPENAI.value,
+                )
+
+        # 2. Fallback to base agent key match
+        base_agent_key = extract_base_agent_key(agent_id)
+        for config in self.agent_models:
+            if extract_base_agent_key(config.agent_id) == base_agent_key:
+                return (
+                    config.model_name or self.model_name or "gpt-4.1",
+                    config.model_provider
+                    or self.model_provider
+                    or ModelProvider.OPENAI.value,
+                )
+
+        # 3. Final fallback to global model settings
         return (
             self.model_name or "gpt-4.1",
             self.model_provider or ModelProvider.OPENAI.value,
         )
 
     def get_agent_runtime_config(self, agent_id: str) -> Optional[AgentModelConfig]:
+        """Get full runtime config for a specific agent with exact-match precedence."""
         if not self.agent_models:
             return None
+
+        # 1. Try exact node ID match first
+        for config in self.agent_models:
+            if config.agent_id == agent_id:
+                return config
+
+        # 2. Fallback to base agent key match
         base_agent_key = extract_base_agent_key(agent_id)
         for config in self.agent_models:
-            config_base_key = extract_base_agent_key(config.agent_id)
-            if config.agent_id == agent_id or config_base_key == base_agent_key:
+            if extract_base_agent_key(config.agent_id) == base_agent_key:
                 return config
+
         return None
 
 
@@ -347,9 +399,11 @@ class FlowRunResponse(BaseModel):
     updated_at: Optional[datetime]
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
+    profile_name: Optional[str] = None
     request_data: Optional[Dict[str, Any]]
     results: Optional[Dict[str, Any]]
     error_message: Optional[str]
+    cancellation_requested: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -639,3 +693,166 @@ class AgentDefaultPromptResponse(BaseModel):
 class AgentApplyToAllRequest(BaseModel):
     fields: AgentConfigurationUpdateRequest
     exclude_agents: List[str] = Field(default_factory=list)
+# --- CLI Flow Control and Manifest Management Schemas ---
+
+class CatalogResponse(BaseModel):
+    status: Literal["ready", "degraded", "unavailable"] = "ready"
+    version: str
+    items: List[Dict[str, Any]]
+
+
+class AgentCatalogEntry(BaseModel):
+    agent_key: str
+    display_name: str
+    description: Optional[str] = None
+    agent_type: str = "analyst"
+    default_order: int = 10
+    supported_node_category: str = "analyst"
+    configurable_runtime_fields: List[str] = Field(default_factory=list)
+
+
+class NodeTypeCatalogEntry(BaseModel):
+    type_key: str
+    category: str
+    display_name: str
+    allowed_inbound: List[str]
+    allowed_outbound: List[str]
+    required_fields: List[str]
+    optional_fields: List[str]
+    compiler_strategy: str
+
+
+class SwarmCatalogEntry(BaseModel):
+    swarm_id: str
+    display_name: str
+    member_templates: List[str]
+    execution_policy: str
+    merge_policy: str
+    risk_policy: str
+    output_target: str
+
+
+class OutputSinkCatalogEntry(BaseModel):
+    sink_key: str
+    display_name: str
+    delivery_modes: List[str]
+    artifact_types: List[str]
+
+
+class FlowManifestSchema(BaseModel):
+    manifest_version: str = "1.0"
+    flow: Dict[str, Any] = Field(default_factory=dict)
+    catalog_refs: Dict[str, str] = Field(default_factory=dict)
+    nodes: List[Dict[str, Any]] = Field(default_factory=list)
+    edges: List[Dict[str, Any]] = Field(default_factory=list)
+    swarms: List[Dict[str, Any]] = Field(default_factory=list)
+    input_resolution: Dict[str, Any] = Field(default_factory=dict)
+    agent_runtime: Dict[str, Any] = Field(default_factory=dict)
+    portfolio_policy: Dict[str, Any] = Field(default_factory=dict)
+    execution_policy: Dict[str, Any] = Field(default_factory=dict)
+    data_policy: Dict[str, Any] = Field(default_factory=dict)
+    outputs: Dict[str, Any] = Field(default_factory=dict)
+    run_profiles: List[Dict[str, Any]] = Field(default_factory=list)
+    audit_policy: Dict[str, Any] = Field(default_factory=dict)
+    compatibility_mappings: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ManifestImportRequest(BaseModel):
+    manifest: FlowManifestSchema
+    options: Dict[str, Any] = Field(default_factory=lambda: {"validate_only": False, "materialize_legacy_projection": True})
+
+
+class ManifestExportResponse(BaseModel):
+    manifest: FlowManifestSchema
+    compiled_view: Optional[Dict[str, Any]] = None
+    legacy_projection: Optional[Dict[str, Any]] = None
+    latest_run_snapshot: Optional[Dict[str, Any]] = None
+    artifacts: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ValidationIssue(BaseModel):
+    code: str
+    path: str
+    message: str
+
+
+class ValidationResponse(BaseModel):
+    valid: bool
+    errors: List[ValidationIssue] = Field(default_factory=list)
+    warnings: List[ValidationIssue] = Field(default_factory=list)
+    catalog_versions: Dict[str, str] = Field(default_factory=dict)
+
+
+class CompilationResponse(BaseModel):
+    compiled_request: Dict[str, Any]
+    compatibility_projection: Dict[str, Any]
+    expansion_map: Dict[str, List[str]]
+    resolved_symbols: List[Any] = Field(default_factory=list)
+    warnings: List[ValidationIssue] = Field(default_factory=list)
+
+
+class RunLaunchRequest(BaseModel):
+    profile_name: str
+    overrides: Dict[str, Any] = Field(default_factory=dict)
+    live_execution_confirmed: bool = False
+
+
+class RunLaunchResponse(BaseModel):
+    run_id: int
+    flow_id: int
+    profile_name: str
+    status: FlowRunStatus
+    mode: str
+    events_url: str
+    details_url: str
+
+
+class RunProfileResponse(BaseModel):
+    profile_name: str
+    mode: str
+    config: Dict[str, Any]
+
+
+class RunSummaryResponse(BaseModel):
+    run_id: int
+    flow_id: int
+    status: FlowRunStatus
+    profile_name: Optional[str] = None
+    manifest_snapshot_ref: Optional[str] = None
+    resolved_symbols_count: int = 0
+    artifact_count: int = 0
+    bridge_status: str = "unknown"
+
+
+class DecisionJournalEntry(BaseModel):
+    timestamp: datetime
+    decision_stage: str
+    instrument: str
+    action: str
+    quantity: float
+    rationale: Optional[str] = None
+
+
+class TradeJournalEntry(BaseModel):
+    timestamp: datetime
+    instrument: str
+    intent: str
+    mode: str
+    status: str
+    execution_details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ArtifactIndexEntry(BaseModel):
+    artifact_id: str
+    artifact_type: str
+    format: str
+    created_at: datetime
+    download_url: str
+
+
+class ProvenanceResponse(BaseModel):
+    status: str
+    resolved_at: datetime
+    symbols: List[Dict[str, Any]]
+    diagnostics: List[str]
+    bridge_snapshot: Optional[Dict[str, Any]] = None
