@@ -1,0 +1,12 @@
+# Macro Sentiment Swarm Template
+swarm_id: "macro_sentiment"
+display_name: "Global Macro Sentiment Swarm"
+member_templates:
+  - agent_type: "sentiment_analyst"
+    count: 2
+  - agent_type: "macro_economist"
+    count: 1
+execution_policy: "sequential"
+merge_policy: "weighted_avg"
+risk_policy: "standard"
+output_target: "decision_node"

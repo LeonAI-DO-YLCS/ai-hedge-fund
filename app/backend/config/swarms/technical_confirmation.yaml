@@ -1,0 +1,10 @@
+# Technical Confirmation Swarm Template
+swarm_id: "technical_confirmation"
+display_name: "Multi-Timeframe Technical Swarm"
+member_templates:
+  - agent_type: "technical_analyst"
+    count: 4
+execution_policy: "parallel"
+merge_policy: "unanimous"
+risk_policy: "standard"
+output_target: "portfolio_manager"

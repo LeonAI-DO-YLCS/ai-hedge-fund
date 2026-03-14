@@ -12,24 +12,7 @@ from src.utils.analysts import ANALYST_CONFIG
 from src.graph.state import AgentState
 
 
-def extract_base_agent_key(unique_id: str) -> str:
-    """
-    Extract the base agent key from a unique node ID.
-    
-    Args:
-        unique_id: The unique node ID with suffix (e.g., "warren_buffett_abc123")
-    
-    Returns:
-        The base agent key (e.g., "warren_buffett")
-    """
-    # For agent nodes, remove the last underscore and 6-character suffix
-    parts = unique_id.split('_')
-    if len(parts) >= 2:
-        last_part = parts[-1]
-        # If the last part is a 6-character alphanumeric string, it's likely our suffix
-        if len(last_part) == 6 and re.match(r'^[a-z0-9]+$', last_part):
-            return '_'.join(parts[:-1])
-    return unique_id  # Return original if no suffix pattern found
+from app.backend.models.schemas import extract_base_agent_key
 
 
 # Helper function to create the agent graph
@@ -153,28 +136,53 @@ def run_graph(
     start date, end date, show reasoning, model name,
     and model provider.
     """
-    return graph.invoke(
-        {
-            "messages": [
-                HumanMessage(
-                    content="Make trading decisions based on the provided data.",
-                )
-            ],
-            "data": {
-                "tickers": tickers,
-                "portfolio": portfolio,
-                "start_date": start_date,
-                "end_date": end_date,
-                "analyst_signals": {},
+    from src.utils.progress import progress
+    from app.backend.services.orchestrator import run_orchestrator
+    
+    run_id = getattr(request, "run_id", None) if request else None
+    
+    # Define a handler that bridges legacy progress updates to the orchestrator events
+    def progress_event_handler(agent_name, ticker, status, analysis, timestamp):
+        if run_id:
+            run_orchestrator.emit_event(
+                run_id=run_id,
+                agent=agent_name,
+                status=status,
+                metadata={
+                    "ticker": ticker,
+                    "analysis": analysis,
+                    "timestamp": timestamp
+                }
+            )
+            
+    # Register handler for the duration of this graph run
+    progress.register_handler(progress_event_handler)
+    
+    try:
+        return graph.invoke(
+            {
+                "messages": [
+                    HumanMessage(
+                        content="Make trading decisions based on the provided data.",
+                    )
+                ],
+                "data": {
+                    "tickers": tickers,
+                    "portfolio": portfolio,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "analyst_signals": {},
+                },
+                "metadata": {
+                    "show_reasoning": False,
+                    "model_name": model_name,
+                    "model_provider": model_provider,
+                    "request": request,  # Pass the request for agent-specific model access
+                },
             },
-            "metadata": {
-                "show_reasoning": False,
-                "model_name": model_name,
-                "model_provider": model_provider,
-                "request": request,  # Pass the request for agent-specific model access
-            },
-        },
-    )
+        )
+    finally:
+        progress.unregister_handler(progress_event_handler)
 
 
 def parse_hedge_fund_response(response):

@@ -1,0 +1,12 @@
+# Cross Asset Regime Swarm Template
+swarm_id: "cross_asset_regime"
+display_name: "Cross-Asset Correlation Swarm"
+member_templates:
+  - agent_type: "correlation_expert"
+    count: 2
+  - agent_type: "regime_classifier"
+    count: 1
+execution_policy: "parallel"
+merge_policy: "hierarchical"
+risk_policy: "diversified"
+output_target: "risk_manager"

@@ -1,0 +1,14 @@
+swarm_id: value_investing
+display_name: Value Investing Swarm
+description: A specialized group of analysts focused on intrinsic value and margin of safety.
+membership:
+  - agent_key: warren_buffett
+    weight: 1.0
+  - agent_key: charlie_munger
+    weight: 0.8
+  - agent_key: ben_graham
+    weight: 0.9
+merge_policy: weighted_consensus
+input_selector:
+  mode: mt5_catalog
+  category: "Equity-US"
