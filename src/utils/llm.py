@@ -1,8 +1,11 @@
 """Helper functions for LLM"""
 
 import json
+from typing import Any
+
 from pydantic import BaseModel
 from src.llm.models import get_model, get_model_info
+from src.utils.agent_config import get_agent_runtime_config
 from src.utils.progress import progress
 from src.graph.state import AgentState
 
@@ -29,7 +32,7 @@ def call_llm(
     Returns:
         An instance of the specified Pydantic model
     """
-    
+
     # Extract model configuration if state is provided and agent_name is available
     if state and agent_name:
         model_name, model_provider = get_agent_model_config(state, agent_name)
@@ -42,43 +45,142 @@ def call_llm(
     api_keys = None
     if state:
         request = state.get("metadata", {}).get("request")
-        if request and hasattr(request, 'api_keys'):
+        if request and hasattr(request, "api_keys"):
             api_keys = request.api_keys
 
-    model_info = get_model_info(model_name, model_provider)
-    llm = get_model(model_name, model_provider, api_keys)
+    runtime_config = (
+        get_agent_runtime_config(state, agent_name) if state and agent_name else None
+    )
 
-    # For non-JSON support models, we can use structured output
-    if not (model_info and not model_info.has_json_mode()):
-        llm = llm.with_structured_output(
-            pydantic_model,
-            method="json_mode",
+    def build_progress_metadata(
+        active_model_name: str,
+        active_model_provider: str | Any,
+        phase: str,
+        fallback_used: bool,
+        error: str | None = None,
+    ) -> str:
+        payload = {
+            "model_name": active_model_name,
+            "model_provider": active_model_provider.value
+            if hasattr(active_model_provider, "value")
+            else str(active_model_provider),
+            "phase": phase,
+            "fallback_used": fallback_used,
+        }
+        if error:
+            payload["error"] = error
+        return json.dumps(payload)
+
+    def invoke_with_retries(
+        active_model_name: str,
+        active_model_provider: str | Any,
+        fallback_used: bool = False,
+    ) -> BaseModel:
+        last_error: Exception | None = None
+        for attempt in range(max_retries):
+            try:
+                model_info = get_model_info(active_model_name, active_model_provider)
+                llm = get_model(
+                    active_model_name,
+                    active_model_provider,
+                    api_keys,
+                    temperature=runtime_config.temperature if runtime_config else None,
+                    max_tokens=runtime_config.max_tokens if runtime_config else None,
+                    top_p=runtime_config.top_p if runtime_config else None,
+                )
+
+                if not (model_info and not model_info.has_json_mode()):
+                    llm = llm.with_structured_output(pydantic_model, method="json_mode")
+
+                result = llm.invoke(prompt)
+                if model_info and not model_info.has_json_mode():
+                    parsed_result = extract_json_from_response(result.content)
+                    if parsed_result:
+                        return pydantic_model(**parsed_result)
+                    raise ValueError("Model returned non-JSON content")
+                return result
+            except Exception as e:
+                last_error = e
+                if agent_name:
+                    progress.update_status(
+                        agent_name,
+                        None,
+                        f"Error - retry {attempt + 1}/{max_retries}",
+                        build_progress_metadata(
+                            active_model_name,
+                            active_model_provider,
+                            "fallback" if fallback_used else "retry",
+                            fallback_used,
+                            str(e),
+                        ),
+                    )
+        raise last_error or RuntimeError("Unknown LLM invocation failure")
+
+    try:
+        return invoke_with_retries(model_name, model_provider)
+    except Exception as primary_error:
+        fallback_model_name = (
+            runtime_config.fallback_model_name if runtime_config else None
+        )
+        fallback_model_provider = (
+            runtime_config.fallback_model_provider
+            if runtime_config and runtime_config.fallback_model_provider
+            else model_provider
         )
 
-    # Call the LLM with retries
-    for attempt in range(max_retries):
-        try:
-            # Call the LLM
-            result = llm.invoke(prompt)
-
-            # For non-JSON support models, we need to extract and parse the JSON manually
-            if model_info and not model_info.has_json_mode():
-                parsed_result = extract_json_from_response(result.content)
-                if parsed_result:
-                    return pydantic_model(**parsed_result)
-            else:
-                return result
-
-        except Exception as e:
+        if fallback_model_name:
             if agent_name:
-                progress.update_status(agent_name, None, f"Error - retry {attempt + 1}/{max_retries}")
+                progress.update_status(
+                    agent_name,
+                    None,
+                    "Switching to fallback model",
+                    build_progress_metadata(
+                        fallback_model_name,
+                        fallback_model_provider,
+                        "fallback",
+                        True,
+                        str(primary_error),
+                    ),
+                )
+            try:
+                fallback_result = invoke_with_retries(
+                    fallback_model_name, fallback_model_provider, True
+                )
+                if agent_name:
+                    progress.update_status(
+                        agent_name,
+                        None,
+                        "Fallback model succeeded",
+                        build_progress_metadata(
+                            fallback_model_name,
+                            fallback_model_provider,
+                            "fallback",
+                            True,
+                        ),
+                    )
+                return fallback_result
+            except Exception as fallback_error:
+                print(
+                    f"Error in fallback LLM call after {max_retries} attempts: {fallback_error}"
+                )
+                if agent_name:
+                    progress.update_status(
+                        agent_name,
+                        None,
+                        "Fallback model failed",
+                        build_progress_metadata(
+                            fallback_model_name,
+                            fallback_model_provider,
+                            "default_response",
+                            True,
+                            str(fallback_error),
+                        ),
+                    )
 
-            if attempt == max_retries - 1:
-                print(f"Error in LLM call after {max_retries} attempts: {e}")
-                # Use default_factory if provided, otherwise create a basic default
-                if default_factory:
-                    return default_factory()
-                return create_default_response(pydantic_model)
+        print(f"Error in LLM call after {max_retries} attempts: {primary_error}")
+        if default_factory:
+            return default_factory()
+        return create_default_response(pydantic_model)
 
     # This should never be reached due to the retry logic above
     return create_default_response(pydantic_model)
@@ -94,7 +196,10 @@ def create_default_response(model_class: type[BaseModel]) -> BaseModel:
             default_values[field_name] = 0.0
         elif field.annotation == int:
             default_values[field_name] = 0
-        elif hasattr(field.annotation, "__origin__") and field.annotation.__origin__ == dict:
+        elif (
+            hasattr(field.annotation, "__origin__")
+            and field.annotation.__origin__ == dict
+        ):
             default_values[field_name] = {}
         else:
             # For other types (like Literal), try to use the first allowed value
@@ -128,20 +233,22 @@ def get_agent_model_config(state, agent_name):
     Always returns valid model_name and model_provider values.
     """
     request = state.get("metadata", {}).get("request")
-    
-    if request and hasattr(request, 'get_agent_model_config'):
+
+    if request and hasattr(request, "get_agent_model_config"):
         # Get agent-specific model configuration
         model_name, model_provider = request.get_agent_model_config(agent_name)
         # Ensure we have valid values
         if model_name and model_provider:
-            return model_name, model_provider.value if hasattr(model_provider, 'value') else str(model_provider)
-    
+            return model_name, model_provider.value if hasattr(
+                model_provider, "value"
+            ) else str(model_provider)
+
     # Fall back to global configuration (system defaults)
     model_name = state.get("metadata", {}).get("model_name") or "gpt-4.1"
     model_provider = state.get("metadata", {}).get("model_provider") or "OPENAI"
-    
+
     # Convert enum to string if necessary
-    if hasattr(model_provider, 'value'):
+    if hasattr(model_provider, "value"):
         model_provider = model_provider.value
-    
+
     return model_name, model_provider
