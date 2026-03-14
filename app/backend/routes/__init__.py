@@ -1,27 +1,32 @@
 from fastapi import APIRouter
-
-from app.backend.routes.hedge_fund import router as hedge_fund_router
-from app.backend.routes.health import router as health_router
-from app.backend.routes.storage import router as storage_router
-from app.backend.routes.flows import router as flows_router
-from app.backend.routes.flow_runs import router as flow_runs_router
-from app.backend.routes.ollama import router as ollama_router
-from app.backend.routes.language_models import router as language_models_router
-from app.backend.routes.api_keys import router as api_keys_router
-from app.backend.routes.agent_config import router as agent_config_router
-from app.backend.routes.mt5_bridge import router as mt5_bridge_router
+from app.backend.routes import (
+    health,
+    hedge_fund,
+    storage,
+    flows,
+    flow_runs,
+    ollama,
+    language_models,
+    api_keys,
+    agent_config,
+    mt5_bridge,
+    flow_catalog,
+    runs,
+)
 
 # Main API router
 api_router = APIRouter()
 
 # Include sub-routers
-api_router.include_router(health_router, tags=["health"])
-api_router.include_router(hedge_fund_router, tags=["hedge-fund"])
-api_router.include_router(storage_router, tags=["storage"])
-api_router.include_router(flows_router, tags=["flows"])
-api_router.include_router(flow_runs_router, tags=["flow-runs"])
-api_router.include_router(ollama_router, tags=["ollama"])
-api_router.include_router(language_models_router, tags=["language-models"])
-api_router.include_router(api_keys_router, tags=["api-keys"])
-api_router.include_router(agent_config_router, tags=["agent-config"])
-api_router.include_router(mt5_bridge_router, tags=["mt5"])
+api_router.include_router(health.router)
+api_router.include_router(hedge_fund.router)
+api_router.include_router(storage.router)
+api_router.include_router(flows.router)
+api_router.include_router(flow_runs.router)
+api_router.include_router(ollama.router)
+api_router.include_router(language_models.router)
+api_router.include_router(api_keys.router)
+api_router.include_router(agent_config.router)
+api_router.include_router(mt5_bridge.router)
+api_router.include_router(flow_catalog.router)
+api_router.include_router(runs.router)
