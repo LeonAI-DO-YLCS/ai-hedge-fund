@@ -3,6 +3,9 @@ import { api } from '@/services/api';
 export interface LanguageModel {
   display_name: string;
   model_name: string;
+  source?: string;
+  is_custom?: boolean;
+  is_stale?: boolean;
   provider:
     | "Anthropic"
     | "DeepSeek"
@@ -20,6 +23,25 @@ export interface LanguageModel {
 
 // Cache for models to avoid repeated API calls
 let languageModels: LanguageModel[] | null = null;
+
+export const clearModelsCache = (): void => {
+  languageModels = null;
+};
+
+export const findModelByIdentity = (
+  models: LanguageModel[],
+  modelName?: string | null,
+  provider?: string | null
+): LanguageModel | null => {
+  if (!modelName) {
+    return null;
+  }
+  return (
+    models.find((model) => model.model_name === modelName && (!provider || model.provider === provider))
+    || models.find((model) => model.model_name === modelName)
+    || null
+  );
+};
 
 /**
  * Get the list of models from the backend API

@@ -43,12 +43,17 @@ export interface LanguageModelProviderResponse {
   name: string;
   type?: 'cloud' | 'local';
   available?: boolean;
-  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | string;
+  status?: 'ready' | 'degraded' | 'unavailable' | 'unknown' | 'valid' | 'unverified' | 'unconfigured' | string;
+  source?: 'database' | 'environment' | 'local' | 'none' | string;
   error?: string | null;
   last_checked_at?: string;
   models: Array<{
     display_name: string;
     model_name: string;
+    provider?: string;
+    source?: string;
+    is_custom?: boolean;
+    is_stale?: boolean;
   }>;
 }
 
@@ -104,6 +109,48 @@ export const api = {
       console.error('Failed to fetch language model providers:', error);
       throw error;
     }
+  },
+
+  discoverModels: async (provider: string, forceRefresh = false) => {
+    const response = await fetch(`${API_BASE_URL}/language-models/discover`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ provider, force_refresh: forceRefresh }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to discover models: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  validateCustomModel: async (provider: string, modelName: string, displayName?: string) => {
+    const response = await fetch(`${API_BASE_URL}/language-models/custom-models/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ provider, model_name: modelName, display_name: displayName }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to validate custom model: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
+  createCustomModel: async (provider: string, modelName: string, displayName?: string) => {
+    const response = await fetch(`${API_BASE_URL}/language-models/custom-models`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ provider, model_name: modelName, display_name: displayName }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to save custom model: ${response.statusText}`);
+    }
+    return response.json();
   },
 
   /**

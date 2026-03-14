@@ -2,15 +2,28 @@
 export enum ModelProvider {
   OPENAI = 'OpenAI',
   ANTHROPIC = 'Anthropic',
+  DEEPSEEK = 'DeepSeek',
+  GOOGLE = 'Google',
   GROQ = 'Groq',
   OLLAMA = 'Ollama',
   LMSTUDIO = 'LMStudio',
+  OPENROUTER = 'OpenRouter',
+  XAI = 'xAI',
+  GIGACHAT = 'GigaChat',
+  AZURE_OPENAI = 'Azure OpenAI',
 }
 
 export interface AgentModelConfig {
   agent_id: string;
   model_name?: string;
   model_provider?: ModelProvider;
+  fallback_model_name?: string;
+  fallback_model_provider?: ModelProvider;
+  system_prompt_override?: string;
+  system_prompt_append?: string;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
 }
 
 export interface GraphNode {
